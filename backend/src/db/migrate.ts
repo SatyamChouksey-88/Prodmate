@@ -19,7 +19,12 @@ async function migrate() {
   await pool.query(phase9);
   const phase12 = fs.readFileSync(path.join(__dirname, 'schema_phase12.sql'), 'utf8');
   await pool.query(phase12);
-  console.log('Migration complete (phase 3 + 4 + 8 + 7 + 9 + 12).');
+  const generationsIdx = fs.readFileSync(
+    path.join(__dirname, 'schema_generations_user_created_idx.sql'),
+    'utf8'
+  );
+  await pool.query(generationsIdx);
+  console.log('Migration complete (phase 3 + 4 + 8 + 7 + 9 + 12 + generations idx).');
   await pool.end();
 }
 
