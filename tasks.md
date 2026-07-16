@@ -1,6 +1,6 @@
 # ProdMate — Build Tasks (Shared Ground Truth)
 
-_Last updated: July 16, 2026 (Phase 7 ingest rate limit closed; pgvector isolation pending live DB)_  
+_Last updated: July 16, 2026 (Phase 9 tag ensure + Phase 10 band 1–2/trivials)_  
 _Source of truth for multi-phase work. Update status as phases complete._
 
 ## Status legend
@@ -24,6 +24,7 @@ _Source of truth for multi-phase work. Update status as phases complete._
 | D9 | Multi-tenancy grain (Phase 4) | **User-level isolation only** (`user_id` on all rows). Org-level multi-tenancy (`orgs` / `org_id`) deferred until multi-company SaaS is a real requirement — not built preemptively. | **Confirmed** |
 | D10 | Knowledge Mesh vector store (Phase 7) | **pgvector** on the existing Azure Database for PostgreSQL (D2) — not a separate vector DB. | **Confirmed** |
 | D11 | Knowledge Mesh embedding model (Phase 7) | **`gemini-embedding-001`** (text-only, GA). Not `gemini-embedding-2` (multimodal) — no multimodal ingestion requirement. | **Confirmed** |
+| D12 | ClickUp auth (Phase 9) | **Personal API token** (`pk_…`), header `Authorization: {token}` — not OAuth2. Escalated to and confirmed by human (2026-07-16). Same pattern as D4 (Jira). Value/risk → **tags** (`value:High`, `risk:Medium`); hierarchy **Epic→List, Feature→Task, Story→Subtask** under a configured **Space** (folderless Lists; no Folder nesting). | **Confirmed** |
 
 ---
 
@@ -177,15 +178,16 @@ _Source of truth for multi-phase work. Update status as phases complete._
 
 - [x] Tier ranking documented (this section) — Product Owner analysis, 2026-07-16
 - [x] Next-adapter pick: **ClickUp** (Product Owner decision, implementation-level — not escalated). Reasoning: ClickUp's native hierarchy is Space→Folder→List→Task→Subtask — four levels, enough to map Epic→Feature→Story cleanly without the label-workaround Jira needed for its mid-tier grouping (D8c). Asana was the other realistic Tier 2 pick, but its native model is Project→Task→Subtask — one level short of a clean 3-tier mapping, closer to Jira's original problem than ClickUp's. ClickUp also has solid free-tier REST API access, which lowers the risk of repeating Phase 2's live-verify gap (no test credentials available) when this phase is actually built.
-- [ ] Scope `ClickUpAdapter`: auth method (API token vs OAuth), `business_value`/`risk_impact` field mapping (custom fields vs tags), List→Task→Subtask ↔ Epic→Feature→Story mapping — not designed yet, starts when this phase is picked up
-- [ ] Implement `ClickUpAdapter` behind the existing `WorkItemTrackerAdapter` — no changes to ADO/Jira adapters
-- [ ] Settings UI: add ClickUp as a third provider option
-- [ ] Verify: live ClickUp test-workspace export with evidence (work item IDs/URLs) — do not mark done on code-completeness alone
+- [x] Scope `ClickUpAdapter`: **D12** personal API token; value/risk → tags; Epic→List / Feature→Task / Story→Subtask under Space (folderless Lists)
+- [x] Implement `ClickUpAdapter` behind the existing `WorkItemTrackerAdapter` — no changes to ADO/Jira adapters
+- [x] Settings UI: add ClickUp as a third provider option (Space ID + personal API token)
+- [x] Ensure value/risk Space tags (`value:`/`risk:` High|Medium|Low) via GET+POST `/space/{id}/tag` before first story create (idempotent, once per adapter instance)
+- [~] Verify: live ClickUp test-workspace export with evidence (work item IDs/URLs) — **CODE COMPLETE, NOT LIVE-VERIFIED**. No ClickUp test credentials in this environment (2026-07-16). Same bar as Phase 2.
 - [ ] Revisit Tier 3/4/5 prioritization once the Tier 2 adapter ships and real user demand signal exists
 
 ---
 
-## Phase 10 — Performance & UI Polish (queued after Phase 8; not started)
+## Phase 10 — Performance & UI Polish (**band 1+2 + trivials landed 2026-07-16**; bands 3–5 deferred)
 
 **Outcome:** A PO using this daily never hits a stall, a silent freeze, or a rough/inconsistent-looking screen — the product feels fast and trustworthy end to end.
 
@@ -193,22 +195,53 @@ _Source of truth for multi-phase work. Update status as phases complete._
 
 **Performance:**
 
-- [ ] Audit every user action (generate, export, retry, history load/delete, tracker connection test) for anything that blocks the UI thread or leaves the user staring at a spinner with no feedback for more than ~1-2s without a progress indicator or step-by-step status — extend Phase 5's export progress-indicator pattern everywhere long operations exist, don't leave gaps
-- [ ] Long-running operations (generate, export) get real server-side timeout + retry/circuit-breaker behavior — nothing hangs indefinitely waiting on Gemini or a tracker API with no ceiling
-- [-] **Escalate, do not decide alone:** if closing the "nothing hangs" gap requires new infra (e.g. a job queue like BullMQ/Redis for generate/export instead of a synchronous request) — that has real cost/ops implications and goes to the human before committing, per standing escalation rules. Everything else in this phase is Product-Owner-decided.
-- [ ] History list paginated or virtualized before it degrades at scale (Phase 5 added delete; confirm the list itself doesn't slow down first — don't wait until delete is the only lever)
-- [ ] Confirm Phase 4's `user_id`-scoped queries (`generations`, `tracker_configs`, `audit_logs`) are actually indexed — state explicitly what's indexed vs assumed, cite the actual index, don't take it on faith
-- [ ] Optimistic UI where safe (e.g. history delete feels instant, rolls back on failure) instead of a round-trip wait per interaction
-- [ ] Quick pass on React state structure in `App.tsx` / `ResultsDisplay` for obvious re-render storms — e.g. whole-tree re-render on every keystroke in the Phase 5 review/edit step
+- [x] Audit every user action — findings recorded; demo export live progress existed; API export now streams NDJSON progress
+- [x] Server-side timeouts + AbortSignal: `GEMINI_TIMEOUT_MS` (default 120s), `EMBEDDING_TIMEOUT_MS` (60s), `TRACKER_FETCH_TIMEOUT_MS` (30s); Gemini/`embedContent` use `abortSignal`; tracker `fetch` uses `timeoutSignal`; client disconnect aborts generate/export. Proven by `backend/src/http/timeout.test.ts` (in-flight hang aborts under 2s).
+- [-] **Escalate, do not decide alone:** BullMQ/Redis **not built** — sync timeouts preferred. Queue only if human escalates.
+- [x] History list scale audit — `LIMIT 100`; pagination deferred (band 3+)
+- [x] Confirm `user_id` indexes — all present
+- [ ] Optimistic UI (history delete) — **deferred** (band 3)
+- [x] React re-render audit — fix deferred (band 4)
 
 **UI/UX polish:**
 
-- [ ] Consistent spacing and typography scale across every screen — audit ALL components against the Phase 1 design tokens, not just the ones that got attention during feature phases
-- [ ] Every async state has a real UI treatment: loading, empty, error, and success — no screen ever shows nothing or a raw error string
-- [ ] Responsive layout verified at minimum tablet width — untested by any phase so far
-- [ ] Basic accessibility: keyboard navigation works for login, generate, review, export; visible focus states; form inputs have proper labels — not covered in any phase yet
-- [ ] Form/validation feedback is clear and immediate (settings, login, input area) — no silent failures on bad input
-- [ ] Consistent iconography and button/component styling — no visual drift between components built in different phases
+- [x] Design-token audit
+- [~] Async UI treatments — history empty state + history load errors surfaced; Knowledge spinner/labels deferred
+- [ ] Responsive tablet verify — deferred (band 5)
+- [~] Basic a11y — landed: aria-label on logout / history delete / knowledge delete; Cancel focus ring. Review/Knowledge field labels deferred (band 5)
+- [ ] Form/validation feedback — deferred (band 5)
+- [~] Iconography — Cancel focus ring landed; remaining drift deferred (band 5)
+
+---
+
+## Phase 11 — Product Depth Features (queued after Phase 9/10; not started)
+
+**Outcome:** ProdMate delivers on its original "Dependency Detection" and "Value Tagging" promise more completely, and daily use feels efficient rather than all-or-nothing.
+
+**Done when:** Each of the four features below is demonstrable independently — this phase ships incrementally, not as one all-or-nothing release.
+
+- [ ] **Story-point/effort estimation.** Add a `story_points` field (Fibonacci: 1, 2, 3, 5, 8, 13) to the generation schema, review UI, and tracker export mapping. ADO has a native Story Points field. For Jira, verify against the API whether the target project has story points enabled — don't assume, same discipline D8 required for Feature mapping.
+- [ ] **Existing-backlog dependency/duplicate detection** (highest value — this is the original "Dependency Detection" promise; today's dependency check only looks within one generation, not against the tracker's real backlog). Before/during export, query the target tracker via the existing `WorkItemTrackerAdapter` for existing work items in the target project, similarity-check (title/description) against newly generated stories, and surface possible duplicates or related existing items for review before the user commits the export.
+- [-] **Escalate, do not decide alone:** if the similarity-check method needs new infrastructure (e.g. a new embedding call/dependency beyond what Phase 7 already established in the stack) rather than reusing what's already available, that goes to the human before committing. The method choice itself (embedding-based vs. simpler text matching) is otherwise Product-Owner-decided.
+- [ ] **Inline single-story refine.** A per-story "Regenerate"/"Refine" action (free-text instruction, e.g. "make acceptance criteria more detailed") that calls the LLM for just that story and merges the result back into the existing Epic/Feature tree — no full-Epic regenerate required for a single-story fix, sibling stories untouched.
+- [ ] **Export preview / dry-run.** Before the actual export call, show exactly what will be created (titles, hierarchy, field values) in a preview state requiring explicit confirmation. Extends Phase 5's review-before-export flow — does not duplicate it.
+- [ ] Verify: each feature demonstrable independently; export preview specifically must show real mapped data (not a mockup) before the live export call fires.
+
+---
+
+## Phase 12 — Metrics Dashboard & Team Collaboration (queued after Phase 11; not started)
+
+**Outcome:** ProdMate can prove the value it was originally pitched on (the product deck's promised metrics), and a team can actually collaborate on a generated backlog together instead of one person working in isolation.
+
+**Done when:** The metrics dashboard shows real numbers sourced from actual usage data (not fabricated), and each collaboration feature is demonstrable without requiring full RBAC.
+
+- [ ] **Metrics/Analytics Dashboard.** Extend Phase 4's `audit_logs` to capture what these specific metrics need: time from generate-start to export-complete, edits made during review (proxy for refinement effort), export count per user/time period. Build a simple dashboard view over this data — reading from existing Postgres does not need escalation; standing up a new analytics stack/warehouse would.
+- [ ] Dashboard UI is explicit about what's a real measured metric vs. a proxy/estimate — do not overstate precision the underlying data doesn't support (e.g. "edits during review" is a refinement-effort proxy, not a precise time measurement).
+- [ ] **Comments/notes on individual generated stories** — lightweight discussion, not full edit history.
+- [ ] **Assign a story to a team member** — a simple field, not a permission system.
+- [ ] **Optional soft review/approval marker before export** (e.g. a BA marks stories reviewed before a PO exports) — must stay genuinely optional/soft, not a hard gate; making it mandatory is scope creep into real workflow/approval engineering, explicitly out of scope here.
+- [-] Full role-based permissions — explicitly **not** this phase. This is collaboration metadata, not access control; a much larger, separate effort if ever pursued. Consistent with Phase 5's original call that `User.role` stays a cosmetic label.
+- [ ] Verify: dashboard numbers traceable to real `audit_logs` rows (show the query, not just the UI); collaboration features demonstrable without any new permission-gating logic.
 
 ---
 
@@ -296,5 +329,31 @@ _Source of truth for multi-phase work. Update status as phases complete._
 
 ### Phase 7 addendum — 2026-07-16
 - `POST /api/knowledge/documents` now uses per-user `@fastify/rate-limit` (`RATE_LIMIT_KNOWLEDGE_INGEST_PER_HOUR`, default 20) — same cost-control pattern as generate/export. GET/DELETE unchanged.
+
+### Phase 9 — 2026-07-16
+1. **Outcome:** ClickUp is a third tracker via the shared `WorkItemTrackerAdapter` / `exportBacklog` path (existing `exportLimit`); Epic→List, Feature→Task, Story→Subtask under a Space.
+2. **What changed:**
+   - **D12** recorded; `ClickUpConfig` (`apiToken` + `spaceId`); FE+BE `clickUpAdapter.ts`; factory + SettingsPanel; `schema_phase9.sql` widens provider CHECK; tracker settings redact/merge for ClickUp token
+   - Value/risk → tags; dependencies via `POST /task/{id}/dependency`; no changes to ADO/Jira adapter bodies; no new rate-limit config
+3. **How verified:** Frontend lint/typecheck/tests (4 adapter contract tests); backend `tsc` + Vitest green. **Live ClickUp export: NOT VERIFIED** — no test credentials (mark `[~]`).
+4. **Research applied:** ClickUp docs 2026-07-16 — [Authentication](https://developer.clickup.com/docs/authentication) (`pk_…` header); [Create Folderless List](https://developer.clickup.com/reference/createfolderlesslist); [Create Task](https://developer.clickup.com/reference/createtask) (`parent`, `tags`, `markdown_description`); [FAQ subtasks](https://developer.clickup.com/docs/faq); [Add Dependency](https://developer.clickup.com/reference/adddependency); [Get Space](https://developer.clickup.com/reference/getspace).
+5. **Overrideable / trade-offs:** Space parent (folderless Lists) not Folder; Feature `key` carries `listId` for subtask creates; List URL constructed as `app.clickup.com/{spaceId}/v/li/{listId}`.
+6. **What's next:** Live-verify ClickUp when credentials exist; Phase 10 fixes await PO priority pick (audit below).
+
+### Phase 10 audit — 2026-07-16 (findings only; no fix build)
+1. **Outcome:** Evidence-based audit complete; fixes not started pending PO priority.
+2. **Escalation:** No BullMQ/Redis — prefer sync timeouts + AbortSignal. Queue only if human escalates.
+3. **Indexes:** All `user_id` indexes present (see checklist).
+4. **Top gaps:** no server timeouts; API export lacks live progress; history empty/error UX; ResultsDisplay keystroke re-renders App; a11y labels / icon drift.
+5. **Proposed order:** timeouts → API export progress → history UX/optimistic delete → ResultsDisplay memo/draft → a11y/validation/icons/tablet. Trivials listed in checklist if PO says land them.
+6. **What's next:** Wait for PO to pick a Phase 10 band (or trivials-only).
+
+### Phase 9 addendum + Phase 10 band 1–2 — 2026-07-16
+1. **ClickUp tags:** FE+BE adapters list Space tags then create missing `value:*` / `risk:*` (6 names) via `POST /space/{id}/tag` before first `createUserStory` (also from `testConnection`). Idempotent; once per adapter instance.
+2. **Timeouts:** `timeoutSignal` + env ceilings; Gemini/embeddings `abortSignal`; ADO/Jira/ClickUp fetch abort; generate/export abort on client disconnect. **Verified:** `timeout.test.ts` aborts hung fetch in &lt;2s.
+3. **API export progress:** NDJSON stream (`progress` / `done` / `error`); `apiExport` + App update messages live like demo `onProgress`.
+4. **Trivials:** history empty state; history load errors surfaced; `aria-label` on logout/history/knowledge deletes; Cancel focus ring.
+5. **Deferred:** bands 3–5 (optimistic delete, ResultsDisplay memo, remaining a11y/validation/tablet).
+6. **What's next:** Review; then Phase 10 bands 3–5 or live ClickUp verify when credentials exist.
 
 _Append further reports below._

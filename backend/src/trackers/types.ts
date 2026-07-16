@@ -1,4 +1,4 @@
-export type TrackerProvider = 'azure-devops' | 'jira';
+export type TrackerProvider = 'azure-devops' | 'jira' | 'clickup';
 
 export interface AzureDevOpsConfig {
   provider: 'azure-devops';
@@ -16,7 +16,14 @@ export interface JiraConfig {
   storyIssueType?: string;
 }
 
-export type TrackerConfig = AzureDevOpsConfig | JiraConfig;
+/** D12: personal API token + Space where each Epic becomes a folderless List. */
+export interface ClickUpConfig {
+  provider: 'clickup';
+  apiToken: string;
+  spaceId: string;
+}
+
+export type TrackerConfig = AzureDevOpsConfig | JiraConfig | ClickUpConfig;
 
 export interface WorkItemRef {
   id: string;
@@ -60,6 +67,9 @@ export function isTrackerConfigured(config: TrackerConfig | null | undefined): b
   if (!config) return false;
   if (config.provider === 'azure-devops') {
     return Boolean(config.orgUrl?.trim() && config.project?.trim() && config.pat?.trim());
+  }
+  if (config.provider === 'clickup') {
+    return Boolean(config.apiToken?.trim() && config.spaceId?.trim());
   }
   return Boolean(
     config.baseUrl?.trim() &&

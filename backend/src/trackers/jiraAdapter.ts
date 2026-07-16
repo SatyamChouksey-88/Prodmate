@@ -1,3 +1,6 @@
+import { config as appConfig } from '../config.js';
+import { timeoutSignal } from '../http/timeout.js';
+import type { AdapterFetchOptions } from './adapterOptions.js';
 import type {
   JiraConfig,
   StoryDetails,
@@ -26,9 +29,14 @@ function slugLabel(prefix: string, value: string): string {
   return `${prefix}:${slug || 'untitled'}`;
 }
 
-async function jiraFetch(url: string, options: RequestInit): Promise<Response> {
+async function jiraFetch(
+  url: string,
+  options: RequestInit,
+  parentSignal?: AbortSignal
+): Promise<Response> {
+  const signal = timeoutSignal(appConfig.trackerFetchTimeoutMs, parentSignal);
   try {
-    return await fetch(url, options);
+    return await fetch(url, { ...options, signal });
   } catch (error) {
     if (error instanceof TypeError) {
       throw new Error(`Network error contacting Jira. Check base URL.\n${String(error)}`);
@@ -45,21 +53,28 @@ function sanitizeBaseUrl(baseUrl: string) {
   return baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
 }
 
-export function createJiraAdapter(config: JiraConfig): WorkItemTrackerAdapter {
+export function createJiraAdapter(
+  config: JiraConfig,
+  opts: AdapterFetchOptions = {}
+): WorkItemTrackerAdapter {
   const base = sanitizeBaseUrl(config.baseUrl);
   const storyType = config.storyIssueType?.trim() || 'Story';
   const auth = getAuthHeader(config.email, config.apiToken);
 
   async function createIssue(fields: Record<string, unknown>): Promise<WorkItemRef> {
-    const response = await jiraFetch(`${base}/rest/api/3/issue`, {
-      method: 'POST',
-      headers: {
-        Authorization: auth,
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
+    const response = await jiraFetch(
+      `${base}/rest/api/3/issue`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: auth,
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ fields }),
       },
-      body: JSON.stringify({ fields }),
-    });
+      opts.signal
+    );
 
     if (!response.ok) {
       let errorDetails = `Status ${response.status}`;
@@ -82,7 +97,8 @@ export function createJiraAdapter(config: JiraConfig): WorkItemTrackerAdapter {
     async testConnection(): Promise<string> {
       const response = await jiraFetch(
         `${base}/rest/api/3/project/${encodeURIComponent(config.projectKey)}`,
-        { method: 'GET', headers: { Authorization: auth, Accept: 'application/json' } }
+        { method: 'GET', headers: { Authorization: auth, Accept: 'application/json' } },
+        opts.signal
       );
       if (!response.ok) {
         throw new Error(`Jira connection test failed (Status: ${response.status})`);
@@ -160,19 +176,23 @@ export function createJiraAdapter(config: JiraConfig): WorkItemTrackerAdapter {
     },
 
     async linkDependency(from, dependsOn) {
-      const response = await jiraFetch(`${base}/rest/api/3/issueLink`, {
-        method: 'POST',
-        headers: {
-          Authorization: auth,
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
+      const response = await jiraFetch(
+        `${base}/rest/api/3/issueLink`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: auth,
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            type: { name: 'Blocks' },
+            inwardIssue: { key: from.key },
+            outwardIssue: { key: dependsOn.key },
+          }),
         },
-        body: JSON.stringify({
-          type: { name: 'Blocks' },
-          inwardIssue: { key: from.key },
-          outwardIssue: { key: dependsOn.key },
-        }),
-      });
+        opts.signal
+      );
       if (!response.ok) {
         throw new Error(`Failed to link Jira dependency (Status: ${response.status})`);
       }

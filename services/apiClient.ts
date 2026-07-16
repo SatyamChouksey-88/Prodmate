@@ -117,13 +117,77 @@ export async function apiDeleteKnowledgeDocument(id: string): Promise<void> {
 export async function apiExport(
   epics: Epic[],
   generationId?: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  onProgress?: (message: string) => void
 ): Promise<{ ok: true; progress: string[]; created: ExportedWorkItem[] }> {
-  return api('/api/export', {
+  const res = await fetch(`${apiBase()}/api/export`, {
     method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ epics, generationId }),
     signal,
   });
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    const err = (data as { error?: unknown }).error;
+    const message =
+      typeof err === 'string'
+        ? err
+        : err
+          ? JSON.stringify(err)
+          : `Request failed (${res.status})`;
+    throw new Error(message);
+  }
+
+  const contentType = res.headers.get('content-type') || '';
+  if (!contentType.includes('ndjson') || !res.body) {
+    // Backward-compatible JSON response
+    const data = (await res.json()) as {
+      ok: true;
+      progress: string[];
+      created: ExportedWorkItem[];
+    };
+    return data;
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let progress: string[] = [];
+  let created: ExportedWorkItem[] = [];
+  let streamError: string | null = null;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() ?? '';
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      const event = JSON.parse(trimmed) as
+        | { type: 'progress'; message: string }
+        | { type: 'done'; ok: true; progress: string[]; created: ExportedWorkItem[] }
+        | { type: 'error'; error: string; progress: string[] };
+      if (event.type === 'progress') {
+        progress.push(event.message);
+        onProgress?.(event.message);
+      } else if (event.type === 'done') {
+        progress = event.progress;
+        created = event.created;
+      } else if (event.type === 'error') {
+        progress = event.progress;
+        streamError = event.error;
+      }
+    }
+  }
+
+  if (streamError) {
+    throw new Error(streamError);
+  }
+  return { ok: true, progress, created };
 }
 
 export async function apiGetTrackerSettings(): Promise<TrackerConfig | null> {

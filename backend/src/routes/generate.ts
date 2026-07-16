@@ -26,13 +26,25 @@ export async function generateRoutes(
       }
 
       try {
+        const abort = new AbortController();
+        const onClose = () => {
+          if (!reply.sent) abort.abort();
+        };
+        request.raw.on('close', onClose);
+
         const { knowledgeBase, retrievedCount } = await buildKnowledgeContext(
           request.user!.id,
           parsed.data.requirement,
-          parsed.data.knowledgeBase
+          parsed.data.knowledgeBase,
+          abort.signal
         );
 
-        const epics = await generateStoriesServer(parsed.data.requirement, knowledgeBase);
+        const epics = await generateStoriesServer(
+          parsed.data.requirement,
+          knowledgeBase,
+          abort.signal
+        );
+        request.raw.off('close', onClose);
         const title = epics[0]?.epic || 'Untitled Plan';
         const insert = await query<{ id: string }>(
           `INSERT INTO generations (user_id, title, result_json)

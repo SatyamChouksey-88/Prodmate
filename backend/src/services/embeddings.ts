@@ -1,6 +1,7 @@
 import { GoogleGenAI } from '@google/genai';
 import { config } from '../config.js';
 import { l2Normalize, EMBEDDING_DIMENSIONS } from './embeddingMath.js';
+import { timeoutSignal } from '../http/timeout.js';
 
 export { l2Normalize, toPgVectorLiteral, EMBEDDING_DIMENSIONS } from './embeddingMath.js';
 
@@ -11,12 +12,14 @@ function getClient(): GoogleGenAI {
   return new GoogleGenAI({ apiKey: config.geminiApiKey });
 }
 
-export async function embedTexts(texts: string[]): Promise<number[][]> {
+export async function embedTexts(
+  texts: string[],
+  parentSignal?: AbortSignal
+): Promise<number[][]> {
   if (!texts.length) return [];
   const ai = getClient();
   const out: number[][] = [];
 
-  // Sequential batches keep request size modest; API accepts one content per call here.
   for (const text of texts) {
     const truncated = text.length > 8000 ? text.slice(0, 8000) : text;
     const result = await ai.models.embedContent({
@@ -25,6 +28,7 @@ export async function embedTexts(texts: string[]): Promise<number[][]> {
       config: {
         outputDimensionality: EMBEDDING_DIMENSIONS,
         taskType: 'RETRIEVAL_DOCUMENT',
+        abortSignal: timeoutSignal(config.embeddingTimeoutMs, parentSignal),
       },
     });
     const values = result.embeddings?.[0]?.values;
@@ -41,7 +45,7 @@ export async function embedTexts(texts: string[]): Promise<number[][]> {
   return out;
 }
 
-export async function embedQuery(text: string): Promise<number[]> {
+export async function embedQuery(text: string, parentSignal?: AbortSignal): Promise<number[]> {
   const ai = getClient();
   const truncated = text.length > 8000 ? text.slice(0, 8000) : text;
   const result = await ai.models.embedContent({
@@ -50,6 +54,7 @@ export async function embedQuery(text: string): Promise<number[]> {
     config: {
       outputDimensionality: EMBEDDING_DIMENSIONS,
       taskType: 'RETRIEVAL_QUERY',
+      abortSignal: timeoutSignal(config.embeddingTimeoutMs, parentSignal),
     },
   });
   const values = result.embeddings?.[0]?.values;

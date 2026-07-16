@@ -29,6 +29,18 @@ const emptyJira = (): TrackerConfig => ({
   storyIssueType: 'Story',
 });
 
+const emptyClickUp = (): TrackerConfig => ({
+  provider: 'clickup',
+  apiToken: '',
+  spaceId: '',
+});
+
+function emptyForProvider(provider: TrackerProvider): TrackerConfig {
+  if (provider === 'jira') return emptyJira();
+  if (provider === 'clickup') return emptyClickUp();
+  return emptyAdo();
+}
+
 const SettingsPanel: React.FC<SettingsPanelProps> = ({
   config,
   onSave,
@@ -49,7 +61,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
   const handleProviderChange = (provider: TrackerProvider) => {
     if (provider === formState.provider) return;
-    setFormState(provider === 'jira' ? emptyJira() : emptyAdo());
+    setFormState(emptyForProvider(provider));
     setTestStatus('idle');
     setTestMessage('');
   };
@@ -127,6 +139,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               >
                 <option value="azure-devops">Azure DevOps</option>
                 <option value="jira">Jira Cloud</option>
+                <option value="clickup">ClickUp</option>
               </select>
             </div>
 
@@ -275,6 +288,53 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               </>
             )}
 
+            {formState.provider === 'clickup' && (
+              <>
+                <div>
+                  <label htmlFor="spaceId" className="block text-sm font-medium text-foreground-secondary">
+                    Space ID
+                  </label>
+                  <input
+                    type="text"
+                    id="spaceId"
+                    value={formState.spaceId}
+                    onChange={(e) => setFormState({ ...formState, spaceId: e.target.value })}
+                    placeholder="e.g. 90123456789"
+                    required
+                    disabled={!integrationsEnabled}
+                    className="mt-1 w-full p-2 bg-surface-muted border border-border rounded-md text-sm text-foreground focus:ring-2 focus:ring-accent focus:outline-none disabled:opacity-50"
+                  />
+                  <p className="text-xs text-foreground-muted mt-1">
+                    Each Epic is created as a folderless List under this Space. Open the Space in ClickUp;
+                    the numeric ID is in the URL.
+                  </p>
+                </div>
+                <div>
+                  <label
+                    htmlFor="clickupApiToken"
+                    className="block text-sm font-medium text-foreground-secondary"
+                  >
+                    Personal API token
+                  </label>
+                  <input
+                    type="password"
+                    id="clickupApiToken"
+                    value={formState.apiToken}
+                    onChange={(e) => setFormState({ ...formState, apiToken: e.target.value })}
+                    placeholder="pk_…"
+                    required
+                    disabled={!integrationsEnabled}
+                    className="mt-1 w-full p-2 bg-surface-muted border border-border rounded-md text-sm text-foreground focus:ring-2 focus:ring-accent focus:outline-none disabled:opacity-50"
+                  />
+                  <p className="text-xs text-foreground-muted mt-1">
+                    Settings → Apps → API Token (starts with <code>pk_</code>). Hierarchy: Epic→List,
+                    Feature→Task, Story→Subtask. Value/risk map to tags (<code>value:…</code> /{' '}
+                    <code>risk:…</code>).
+                  </p>
+                </div>
+              </>
+            )}
+
             <div className="text-xs text-warning bg-warning-bg p-2 rounded-md border border-border">
               <strong>Security Note:</strong> When enabled for local demos, credentials are stored in
               plaintext in localStorage. Do not use against production orgs. Phase 3 moves credentials
@@ -348,6 +408,9 @@ function isConfigured(config: TrackerConfig): boolean {
         config.email.trim() &&
         config.apiToken.trim()
     );
+  }
+  if (config.provider === 'clickup') {
+    return Boolean(config.apiToken.trim() && config.spaceId.trim());
   }
   return Boolean(config.orgUrl.trim() && config.project.trim() && config.pat.trim());
 }

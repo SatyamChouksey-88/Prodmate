@@ -12,7 +12,8 @@ const TOP_K = 5;
 export async function buildKnowledgeContext(
   userId: string,
   requirement: string,
-  manualKnowledgeBase: string
+  manualKnowledgeBase: string,
+  signal?: AbortSignal
 ): Promise<{ knowledgeBase: string; retrievedCount: number }> {
   const manual = manualKnowledgeBase.trim();
   const countRes = await countChunksForUser(userId);
@@ -22,7 +23,7 @@ export async function buildKnowledgeContext(
     return { knowledgeBase: manual, retrievedCount: 0 };
   }
 
-  const queryVec = await embedQuery(requirement);
+  const queryVec = await embedQuery(requirement, signal);
   const hits = await searchChunksForUser(userId, queryVec, TOP_K);
   const retrieved = hits.rows.map((h) => h.content).join('\n\n---\n\n');
 

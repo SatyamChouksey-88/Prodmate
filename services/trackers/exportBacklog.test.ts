@@ -94,6 +94,18 @@ describe('WorkItemTrackerAdapter contract via exportBacklog', () => {
     expect(adapter.createUserStory).toHaveBeenCalledTimes(2);
   });
 
+  it('creates real Feature tasks for ClickUp-style adapters (no virtualFeature)', async () => {
+    const adapter = makeAdapter({ provider: 'clickup' });
+    const result = await exportBacklog(adapter, sampleEpics, () => undefined);
+
+    expect(adapter.createEpic).toHaveBeenCalledTimes(1);
+    expect(adapter.createFeature).toHaveBeenCalledTimes(1);
+    expect(adapter.createUserStory).toHaveBeenCalledTimes(2);
+    expect(adapter.linkParent).toHaveBeenCalled();
+    expect(result.created.filter((c) => c.kind === 'feature')).toHaveLength(1);
+    expect(result.created.every((c) => c.kind !== 'feature' || Boolean(c.ref.url))).toBe(true);
+  });
+
   it('aborts mid-loop and reports partial created items', async () => {
     const { ExportAbortedError } = await import('./exportBacklog');
     const controller = new AbortController();

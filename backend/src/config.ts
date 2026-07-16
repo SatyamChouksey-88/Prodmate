@@ -36,6 +36,12 @@ export const config = {
   rateLimitKnowledgeIngestMax: optionalInt('RATE_LIMIT_KNOWLEDGE_INGEST_PER_HOUR', 20),
   /** Soft retention for audit_logs; pruned via `npm run audit:prune`. */
   auditRetentionDays: optionalInt('AUDIT_RETENTION_DAYS', 90),
+  /** Gemini generateContent ceiling (ms). */
+  geminiTimeoutMs: optionalInt('GEMINI_TIMEOUT_MS', 120_000),
+  /** Per embedding API call ceiling (ms). */
+  embeddingTimeoutMs: optionalInt('EMBEDDING_TIMEOUT_MS', 60_000),
+  /** Per tracker HTTP call ceiling (ms). */
+  trackerFetchTimeoutMs: optionalInt('TRACKER_FETCH_TIMEOUT_MS', 30_000),
 };
 
 export function loadConfigLazy() {

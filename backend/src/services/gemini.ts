@@ -1,5 +1,6 @@
 import { GoogleGenAI, Type } from '@google/genai';
 import { config } from '../config.js';
+import { timeoutSignal } from '../http/timeout.js';
 
 const responseSchema = {
   type: Type.ARRAY,
@@ -65,7 +66,8 @@ export type GeneratedEpic = {
 
 export async function generateStoriesServer(
   userInput: string,
-  knowledgeBase: string
+  knowledgeBase: string,
+  parentSignal?: AbortSignal
 ): Promise<GeneratedEpic[]> {
   const ai = new GoogleGenAI({ apiKey: config.geminiApiKey });
 
@@ -92,6 +94,7 @@ ${knowledgeBase || 'No additional context provided.'}
       responseMimeType: 'application/json',
       responseSchema,
       temperature: 0.4,
+      abortSignal: timeoutSignal(config.geminiTimeoutMs, parentSignal),
     },
   });
 

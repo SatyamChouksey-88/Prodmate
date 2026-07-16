@@ -1,14 +1,22 @@
 import { escapeHtml } from '../../../shared/htmlEscape.js';
+import { config as appConfig } from '../config.js';
+import { timeoutSignal } from '../http/timeout.js';
 import type {
   AzureDevOpsConfig,
   StoryDetails,
   WorkItemRef,
   WorkItemTrackerAdapter,
 } from './types.js';
+import type { AdapterFetchOptions } from './adapterOptions.js';
 
-async function adoFetch(url: string, options: RequestInit): Promise<Response> {
+async function adoFetch(
+  url: string,
+  options: RequestInit,
+  parentSignal?: AbortSignal
+): Promise<Response> {
+  const signal = timeoutSignal(appConfig.trackerFetchTimeoutMs, parentSignal);
   try {
-    return await fetch(url, options);
+    return await fetch(url, { ...options, signal });
   } catch (error) {
     if (error instanceof TypeError) {
       throw new Error(
@@ -45,7 +53,8 @@ async function createWorkItem(
   config: AzureDevOpsConfig,
   type: 'Epic' | 'Feature' | 'User Story',
   title: string,
-  details: StoryDetails & { description?: string }
+  details: StoryDetails & { description?: string },
+  parentSignal?: AbortSignal
 ): Promise<WorkItemRef> {
   const apiUrl = `${getApiBaseUrl(config.orgUrl, config.project)}/workitems/$${type}?api-version=7.1-preview.3`;
 
@@ -83,14 +92,18 @@ async function createWorkItem(
     });
   }
 
-  const response = await adoFetch(apiUrl, {
-    method: 'POST',
-    headers: {
-      Authorization: getAuthHeader(config.pat),
-      'Content-Type': 'application/json-patch+json',
+  const response = await adoFetch(
+    apiUrl,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: getAuthHeader(config.pat),
+        'Content-Type': 'application/json-patch+json',
+      },
+      body: JSON.stringify(patchDocument),
     },
-    body: JSON.stringify(patchDocument),
-  });
+    parentSignal
+  );
 
   if (!response.ok) {
     let errorDetails = `Request failed with status ${response.status} ${response.statusText}`;
@@ -107,7 +120,10 @@ async function createWorkItem(
   return { id: String(result.id), url: result.url };
 }
 
-export function createAzureDevOpsAdapter(config: AzureDevOpsConfig): WorkItemTrackerAdapter {
+export function createAzureDevOpsAdapter(
+  config: AzureDevOpsConfig,
+  opts: AdapterFetchOptions = {}
+): WorkItemTrackerAdapter {
   return {
     provider: 'azure-devops',
 
@@ -117,10 +133,14 @@ export function createAzureDevOpsAdapter(config: AzureDevOpsConfig): WorkItemTra
         : config.orgUrl;
       const apiUrl = `${sanitizedOrgUrl}/_apis/projects/${encodeURIComponent(config.project)}?api-version=7.1-preview.4`;
 
-      const response = await adoFetch(apiUrl, {
-        method: 'GET',
-        headers: { Authorization: getAuthHeader(config.pat) },
-      });
+      const response = await adoFetch(
+        apiUrl,
+        {
+          method: 'GET',
+          headers: { Authorization: getAuthHeader(config.pat) },
+        },
+        opts.signal
+      );
 
       if (!response.ok) {
         let errorDetails = `Request failed with status ${response.status}`;
@@ -138,37 +158,41 @@ export function createAzureDevOpsAdapter(config: AzureDevOpsConfig): WorkItemTra
     },
 
     createEpic(title, description) {
-      return createWorkItem(config, 'Epic', title, { description });
+      return createWorkItem(config, 'Epic', title, { description }, opts.signal);
     },
 
     createFeature(title, description) {
-      return createWorkItem(config, 'Feature', title, { description });
+      return createWorkItem(config, 'Feature', title, { description }, opts.signal);
     },
 
     createUserStory(title, details) {
-      return createWorkItem(config, 'User Story', title, details);
+      return createWorkItem(config, 'User Story', title, details, opts.signal);
     },
 
     async linkParent(child, parent) {
       const apiUrl = `${child.url}?api-version=7.1-preview.3`;
-      const response = await adoFetch(apiUrl, {
-        method: 'PATCH',
-        headers: {
-          Authorization: getAuthHeader(config.pat),
-          'Content-Type': 'application/json-patch+json',
-        },
-        body: JSON.stringify([
-          {
-            op: 'add',
-            path: '/relations/-',
-            value: {
-              rel: 'System.LinkTypes.Hierarchy-Reverse',
-              url: parent.url,
-              attributes: { comment: 'Parent' },
-            },
+      const response = await adoFetch(
+        apiUrl,
+        {
+          method: 'PATCH',
+          headers: {
+            Authorization: getAuthHeader(config.pat),
+            'Content-Type': 'application/json-patch+json',
           },
-        ]),
-      });
+          body: JSON.stringify([
+            {
+              op: 'add',
+              path: '/relations/-',
+              value: {
+                rel: 'System.LinkTypes.Hierarchy-Reverse',
+                url: parent.url,
+                attributes: { comment: 'Parent' },
+              },
+            },
+          ]),
+        },
+        opts.signal
+      );
       if (!response.ok) {
         throw new Error(`Failed to link child to parent (Status: ${response.status})`);
       }
@@ -176,24 +200,28 @@ export function createAzureDevOpsAdapter(config: AzureDevOpsConfig): WorkItemTra
 
     async linkDependency(from, dependsOn) {
       const apiUrl = `${from.url}?api-version=7.1-preview.3`;
-      const response = await adoFetch(apiUrl, {
-        method: 'PATCH',
-        headers: {
-          Authorization: getAuthHeader(config.pat),
-          'Content-Type': 'application/json-patch+json',
-        },
-        body: JSON.stringify([
-          {
-            op: 'add',
-            path: '/relations/-',
-            value: {
-              rel: 'System.LinkTypes.Dependency',
-              url: dependsOn.url,
-              attributes: { comment: 'Depends on this story' },
-            },
+      const response = await adoFetch(
+        apiUrl,
+        {
+          method: 'PATCH',
+          headers: {
+            Authorization: getAuthHeader(config.pat),
+            'Content-Type': 'application/json-patch+json',
           },
-        ]),
-      });
+          body: JSON.stringify([
+            {
+              op: 'add',
+              path: '/relations/-',
+              value: {
+                rel: 'System.LinkTypes.Dependency',
+                url: dependsOn.url,
+                attributes: { comment: 'Depends on this story' },
+              },
+            },
+          ]),
+        },
+        opts.signal
+      );
       if (!response.ok) {
         throw new Error(`Failed to link dependency (Status: ${response.status})`);
       }

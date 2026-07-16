@@ -116,7 +116,7 @@ const InputArea: React.FC<InputAreaProps> = ({
             <button
               type="button"
               onClick={onCancel}
-              className="w-full sm:w-auto bg-surface-muted text-foreground font-semibold py-3 px-6 rounded-lg border border-border hover:bg-border"
+              className="w-full sm:w-auto bg-surface-muted text-foreground font-semibold py-3 px-6 rounded-lg border border-border hover:bg-border focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-surface focus:ring-accent"
             >
               Cancel
             </button>

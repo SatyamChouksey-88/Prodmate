@@ -9,7 +9,7 @@
  * Core export orchestration (exportBacklog) should not need changes.
  */
 
-export type TrackerProvider = 'azure-devops' | 'jira';
+export type TrackerProvider = 'azure-devops' | 'jira' | 'clickup';
 
 export interface AzureDevOpsConfig {
   provider: 'azure-devops';
@@ -29,7 +29,16 @@ export interface JiraConfig {
   storyIssueType?: string;
 }
 
-export type TrackerConfig = AzureDevOpsConfig | JiraConfig;
+/** D12: personal API token + Space where each Epic becomes a folderless List. */
+export interface ClickUpConfig {
+  provider: 'clickup';
+  /** Personal API token (pk_…). */
+  apiToken: string;
+  /** Space ID — Epics are created as folderless Lists under this Space. */
+  spaceId: string;
+}
+
+export type TrackerConfig = AzureDevOpsConfig | JiraConfig | ClickUpConfig;
 
 /** @deprecated Use AzureDevOpsConfig / TrackerConfig — kept for migration. */
 export type ADOConfig = Omit<AzureDevOpsConfig, 'provider'> & { provider?: 'azure-devops' };
@@ -86,6 +95,9 @@ export function isTrackerConfigured(config: TrackerConfig | null | undefined): b
   if (config.provider === 'azure-devops') {
     return Boolean(config.orgUrl?.trim() && config.project?.trim() && config.pat?.trim());
   }
+  if (config.provider === 'clickup') {
+    return Boolean(config.apiToken?.trim() && config.spaceId?.trim());
+  }
   return Boolean(
     config.baseUrl?.trim() &&
       config.projectKey?.trim() &&
@@ -106,6 +118,14 @@ export function normalizeTrackerConfig(raw: unknown): TrackerConfig | null {
       email: String(obj.email ?? ''),
       apiToken: String(obj.apiToken ?? ''),
       storyIssueType: obj.storyIssueType ? String(obj.storyIssueType) : undefined,
+    };
+  }
+
+  if (obj.provider === 'clickup') {
+    return {
+      provider: 'clickup',
+      apiToken: String(obj.apiToken ?? ''),
+      spaceId: String(obj.spaceId ?? ''),
     };
   }
 

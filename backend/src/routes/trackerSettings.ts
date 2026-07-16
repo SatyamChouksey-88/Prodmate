@@ -10,7 +10,10 @@ function redact(config: TrackerConfig): TrackerConfig {
   if (config.provider === 'azure-devops') {
     return { ...config, pat: config.pat ? '••••••••' : '' };
   }
-  return { ...config, apiToken: config.apiToken ? '••••••••' : '' };
+  if (config.provider === 'jira' || config.provider === 'clickup') {
+    return { ...config, apiToken: config.apiToken ? '••••••••' : '' };
+  }
+  return config;
 }
 
 export async function trackerSettingsRoutes(app: FastifyInstance) {
@@ -39,7 +42,7 @@ export async function trackerSettingsRoutes(app: FastifyInstance) {
     let toStore = body;
     if (
       (body.provider === 'azure-devops' && body.pat.includes('•')) ||
-      (body.provider === 'jira' && body.apiToken.includes('•'))
+      ((body.provider === 'jira' || body.provider === 'clickup') && body.apiToken.includes('•'))
     ) {
       const existing = await query<{ config_ciphertext: string }>(
         `SELECT config_ciphertext FROM tracker_configs WHERE user_id = $1`,
@@ -52,6 +55,8 @@ export async function trackerSettingsRoutes(app: FastifyInstance) {
       if (body.provider === 'azure-devops' && prev.provider === 'azure-devops') {
         toStore = { ...body, pat: prev.pat };
       } else if (body.provider === 'jira' && prev.provider === 'jira') {
+        toStore = { ...body, apiToken: prev.apiToken };
+      } else if (body.provider === 'clickup' && prev.provider === 'clickup') {
         toStore = { ...body, apiToken: prev.apiToken };
       } else {
         return reply.code(400).send({ error: 'Provider changed — enter credentials again' });

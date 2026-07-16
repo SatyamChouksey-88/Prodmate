@@ -83,6 +83,7 @@ Optional local Postgres without Docker (no pgvector): `npx tsx scripts/start-emb
 
 - **Azure DevOps** — Epic → Feature → User Story (behavior preserved via `AzureDevOpsAdapter`; `adoService.ts` is a thin wrapper).
 - **Jira Cloud** — Epic → Story; Features are grouping labels (D8). Auth: email + API token (D4).
+- **ClickUp** — Epic → List, Feature → Task, Story → Subtask under a Space (D12). Auth: personal API token (`pk_…`). Value/risk → tags.
 
 See `services/trackers/ADDING_A_TRACKER.md`.
 

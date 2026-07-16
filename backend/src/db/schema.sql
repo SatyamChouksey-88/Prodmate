@@ -23,7 +23,7 @@ CREATE INDEX IF NOT EXISTS sessions_expires_at_idx ON sessions(expires_at);
 CREATE TABLE IF NOT EXISTS tracker_configs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  provider TEXT NOT NULL CHECK (provider IN ('azure-devops', 'jira')),
+  provider TEXT NOT NULL CHECK (provider IN ('azure-devops', 'jira', 'clickup')),
   config_ciphertext TEXT NOT NULL,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (user_id)

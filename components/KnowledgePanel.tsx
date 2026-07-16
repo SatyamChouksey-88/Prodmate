@@ -163,6 +163,7 @@ const KnowledgePanel: React.FC = () => {
                   <button
                     type="button"
                     title="Delete"
+                    aria-label={`Delete knowledge document ${doc.title}`}
                     disabled={busy}
                     onClick={() => void handleDelete(doc)}
                     className="px-2 text-foreground-muted hover:text-danger"

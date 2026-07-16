@@ -11,10 +11,6 @@ interface HistoryPanelProps {
 const HistoryPanel: React.FC<HistoryPanelProps> = ({ history, onSelect, onDelete, onClear }) => {
   const [isOpen, setIsOpen] = useState(true);
 
-  if (history.length === 0) {
-    return null;
-  }
-
   return (
     <div className="bg-surface rounded-xl shadow-sm border border-border">
       <button
@@ -38,41 +34,48 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({ history, onSelect, onDelete
       </button>
       {isOpen && (
         <div className="border-t border-border p-2 max-h-60 overflow-y-auto">
-          {onClear && (
-            <div className="px-2 pb-2">
-              <button
-                type="button"
-                onClick={onClear}
-                className="text-xs text-danger hover:underline"
-              >
-                Clear all history
-              </button>
-            </div>
-          )}
-          <ul className="space-y-1">
-            {history.map((item) => (
-              <li key={item.id} className="flex items-stretch gap-1">
-                <button
-                  type="button"
-                  onClick={() => onSelect(item)}
-                  className="flex-1 text-left p-2 rounded-md hover:bg-surface-muted transition-colors"
-                >
-                  <p className="text-sm font-semibold text-foreground truncate">{item.title}</p>
-                  <p className="text-xs text-foreground-muted">{item.date}</p>
-                </button>
-                {onDelete && (
+          {history.length === 0 ? (
+            <p className="px-2 py-3 text-sm text-foreground-muted">No generations yet.</p>
+          ) : (
+            <>
+              {onClear && (
+                <div className="px-2 pb-2">
                   <button
                     type="button"
-                    title="Delete"
-                    onClick={() => onDelete(item)}
-                    className="px-2 text-foreground-muted hover:text-danger"
+                    onClick={onClear}
+                    className="text-xs text-danger hover:underline"
                   >
-                    ×
+                    Clear all history
                   </button>
-                )}
-              </li>
-            ))}
-          </ul>
+                </div>
+              )}
+              <ul className="space-y-1">
+                {history.map((item) => (
+                  <li key={item.id} className="flex items-stretch gap-1">
+                    <button
+                      type="button"
+                      onClick={() => onSelect(item)}
+                      className="flex-1 text-left p-2 rounded-md hover:bg-surface-muted transition-colors"
+                    >
+                      <p className="text-sm font-semibold text-foreground truncate">{item.title}</p>
+                      <p className="text-xs text-foreground-muted">{item.date}</p>
+                    </button>
+                    {onDelete && (
+                      <button
+                        type="button"
+                        title="Delete"
+                        aria-label={`Delete history item ${item.title}`}
+                        onClick={() => onDelete(item)}
+                        className="px-2 text-foreground-muted hover:text-danger"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
         </div>
       )}
     </div>

@@ -55,8 +55,10 @@ function loadLocalTrackerConfig(userName: string): TrackerConfig | null {
 async function loadApiHistory(): Promise<HistoryItem[]> {
   try {
     return await apiGetHistory();
-  } catch {
-    return [];
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : 'Could not load history';
+    throw new Error(message);
   }
 }
 
@@ -127,7 +129,12 @@ const App: React.FC = () => {
         } catch {
           setTrackerConfig(null);
         }
-        setHistory(await loadApiHistory());
+        try {
+          setHistory(await loadApiHistory());
+        } catch (err) {
+          setHistory([]);
+          setError(err instanceof Error ? err.message : 'Could not load history');
+        }
       }
       setAuthReady(true);
     })();
@@ -153,7 +160,12 @@ const App: React.FC = () => {
         } catch {
           setTrackerConfig(null);
         }
-        setHistory(await loadApiHistory());
+        try {
+          setHistory(await loadApiHistory());
+        } catch (err) {
+          setHistory([]);
+          setError(err instanceof Error ? err.message : 'Could not load history');
+        }
       })();
     }
   };
@@ -275,7 +287,11 @@ const App: React.FC = () => {
           if (abortRef.current !== controller) return;
           generatedEpics = result.epics;
           nextGenerationId = result.generationId;
-          setHistory(await loadApiHistory());
+          try {
+            setHistory(await loadApiHistory());
+          } catch (histErr) {
+            setError(histErr instanceof Error ? histErr.message : 'Could not refresh history');
+          }
         } else {
           generatedEpics = await generateStories(inputText, knowledgeBase, controller.signal);
           if (abortRef.current !== controller) return;
@@ -337,10 +353,16 @@ const App: React.FC = () => {
 
     try {
       if (apiMode) {
-        const result = await apiExport(results, generationId, controller.signal);
+        const result = await apiExport(results, generationId, controller.signal, (progress) => {
+          setProgressMessage(progress);
+        });
         if (abortRef.current !== controller) return;
         setExportedItems(result.created);
-        setHistory(await loadApiHistory());
+        try {
+          setHistory(await loadApiHistory());
+        } catch (histErr) {
+          setError(histErr instanceof Error ? histErr.message : 'Could not refresh history');
+        }
       } else {
         const result = await exportToTracker(
           trackerConfig!,
@@ -399,7 +421,11 @@ const App: React.FC = () => {
     if (apiMode) {
       try {
         await apiDeleteHistoryItem(item.id);
-        setHistory(await loadApiHistory());
+        try {
+          setHistory(await loadApiHistory());
+        } catch (histErr) {
+          setError(histErr instanceof Error ? histErr.message : 'Could not refresh history');
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to delete history item');
       }
