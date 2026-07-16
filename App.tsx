@@ -519,12 +519,19 @@ const App: React.FC = () => {
     if (!results || !apiMode) return;
     setCheckingBacklog(true);
     setError(null);
+    setProgressMessage('Checking backlog for similar work…');
     try {
-      const data = await apiBacklogMatches(results);
+      const data = await apiBacklogMatches(results, (msg) => setProgressMessage(msg));
       setBacklogMatches(data.matches);
       setBacklogScanned(data.scanned);
+      setProgressMessage(
+        data.matches.length
+          ? `Backlog check complete — ${data.matches.length} similar item(s) found.`
+          : `Backlog check complete — no close matches in ${data.scanned} item(s).`
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Backlog check failed');
+      setProgressMessage('');
     } finally {
       setCheckingBacklog(false);
     }

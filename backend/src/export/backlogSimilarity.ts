@@ -1,5 +1,5 @@
 import { cosineSimilarity } from '../services/embeddingMath.js';
-import { embedTexts, embedQuery } from '../services/embeddings.js';
+import { embedTexts, embedQueries } from '../services/embeddings.js';
 import type { ExistingWorkItem } from '../trackers/types.js';
 
 export const BACKLOG_LIST_LIMIT = 100;
@@ -28,25 +28,37 @@ function itemText(item: ExistingWorkItem): string {
 
 /**
  * Ephemeral in-memory similarity — not Knowledge Mesh / pgvector.
- * Embeds up to BACKLOG_LIST_LIMIT existing items + each generated story.
+ * Embeds up to BACKLOG_LIST_LIMIT existing items + generated stories via
+ * Gemini batchEmbedContents (through SDK embedContent with string arrays).
  */
 export async function findBacklogMatches(
   stories: GeneratedStoryRef[],
   existing: ExistingWorkItem[],
-  parentSignal?: AbortSignal
+  parentSignal?: AbortSignal,
+  onProgress?: (message: string) => void
 ): Promise<StoryMatch[]> {
   if (!stories.length || !existing.length) return [];
 
   const capped = existing.slice(0, BACKLOG_LIST_LIMIT);
-  const backlogVectors = await embedTexts(
-    capped.map(itemText),
+  onProgress?.(
+    `Embedding ${capped.length} backlog item${capped.length === 1 ? '' : 's'}…`
+  );
+  const backlogVectors = await embedTexts(capped.map(itemText), parentSignal);
+
+  onProgress?.(
+    `Embedding ${stories.length} generated stor${stories.length === 1 ? 'y' : 'ies'}…`
+  );
+  const storyVectors = await embedQueries(
+    stories.map((s) => s.story),
     parentSignal
   );
 
+  onProgress?.('Computing similarity…');
   const matches: StoryMatch[] = [];
 
-  for (const story of stories) {
-    const queryVec = await embedQuery(story.story, parentSignal);
+  for (let s = 0; s < stories.length; s++) {
+    const story = stories[s]!;
+    const queryVec = storyVectors[s]!;
     let best: { score: number; item: ExistingWorkItem } | null = null;
     for (let i = 0; i < capped.length; i++) {
       const score = cosineSimilarity(queryVec, backlogVectors[i]!);
@@ -75,5 +87,6 @@ export async function findBacklogMatches(
   }
 
   matches.sort((a, b) => b.score - a.score);
+  onProgress?.(`Done — ${matches.length} match${matches.length === 1 ? '' : 'es'}.`);
   return matches;
 }

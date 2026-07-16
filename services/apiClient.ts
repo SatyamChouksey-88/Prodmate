@@ -227,13 +227,87 @@ export async function apiExportPreview(
 
 export async function apiBacklogMatches(
   epics: Epic[],
+  onProgress?: (message: string) => void,
   signal?: AbortSignal
 ): Promise<{ ok: true; scanned: number; limit: number; matches: BacklogMatch[] }> {
-  return api('/api/export/backlog-matches', {
+  const res = await fetch(`${apiBase()}/api/export/backlog-matches`, {
     method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ epics }),
     signal,
   });
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    const err = (data as { error?: unknown }).error;
+    const message =
+      typeof err === 'string'
+        ? err
+        : err
+          ? JSON.stringify(err)
+          : `Request failed (${res.status})`;
+    throw new Error(message);
+  }
+
+  const contentType = res.headers.get('content-type') || '';
+  if (!contentType.includes('ndjson') || !res.body) {
+    return (await res.json()) as {
+      ok: true;
+      scanned: number;
+      limit: number;
+      matches: BacklogMatch[];
+    };
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let progress: string[] = [];
+  let scanned = 0;
+  let limit = 0;
+  let matches: BacklogMatch[] = [];
+  let streamError: string | null = null;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() ?? '';
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      const event = JSON.parse(trimmed) as
+        | { type: 'progress'; message: string }
+        | {
+            type: 'done';
+            ok: true;
+            progress: string[];
+            scanned: number;
+            limit: number;
+            matches: BacklogMatch[];
+          }
+        | { type: 'error'; error: string; progress: string[] };
+      if (event.type === 'progress') {
+        progress.push(event.message);
+        onProgress?.(event.message);
+      } else if (event.type === 'done') {
+        progress = event.progress;
+        scanned = event.scanned;
+        limit = event.limit;
+        matches = event.matches;
+      } else if (event.type === 'error') {
+        progress = event.progress;
+        streamError = event.error;
+      }
+    }
+  }
+
+  if (streamError) {
+    throw new Error(streamError);
+  }
+  return { ok: true, scanned, limit, matches };
 }
 
 export type MetricsSummary = {
