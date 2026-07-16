@@ -75,19 +75,20 @@ describe('metrics summary aggregates (user-scoped)', () => {
     const t1 = new Date('2026-07-01T10:00:05.000Z'); // 5000ms later
     const t2 = new Date('2026-07-01T12:00:00.000Z');
 
-    // User A: 2 generates, 1 export (paired), 2 review.edits
+    // User A: 2 generates (with Gemini durationMs), 1 export (paired), 2 review.edits
     await pool.query(
       `INSERT INTO audit_logs (user_id, action, metadata, created_at) VALUES
          ($1, 'generate', $2::jsonb, $3),
          ($1, 'export', $2::jsonb, $4),
-         ($1, 'generate', '{"generationId":"other"}'::jsonb, $5),
-         ($1, 'review.edit', '{"editKind":"field"}'::jsonb, $5),
-         ($1, 'review.edit', '{"editKind":"refine"}'::jsonb, $5)`,
+         ($1, 'generate', $5::jsonb, $6),
+         ($1, 'review.edit', '{"editKind":"field"}'::jsonb, $6),
+         ($1, 'review.edit', '{"editKind":"refine"}'::jsonb, $6)`,
       [
         userA,
-        JSON.stringify({ generationId: genA }),
+        JSON.stringify({ generationId: genA, durationMs: 1200 }),
         t0.toISOString(),
         t1.toISOString(),
+        JSON.stringify({ generationId: 'other', durationMs: 800 }),
         t2.toISOString(),
       ]
     );
@@ -95,7 +96,7 @@ describe('metrics summary aggregates (user-scoped)', () => {
     // User B noise — must not appear in A's summary
     await pool.query(
       `INSERT INTO audit_logs (user_id, action, metadata, created_at) VALUES
-         ($1, 'generate', '{"generationId":"b-gen"}'::jsonb, $2),
+         ($1, 'generate', '{"generationId":"b-gen","durationMs":3000}'::jsonb, $2),
          ($1, 'export', '{"generationId":"b-gen"}'::jsonb, $2),
          ($1, 'review.edit', '{}'::jsonb, $2)`,
       [userB, t2.toISOString()]
@@ -129,6 +130,11 @@ describe('metrics summary aggregates (user-scoped)', () => {
     expect(byId.review_edit_proxy.value).toBe(2);
     expect(byId.generate_to_export_ms.value).toBe(5000);
     expect(byId.generate_to_export_ms.sampleSize).toBe(1);
+    // Gemini duration: mean of 1200 and 800 — distinct from full-cycle 5000
+    expect(byId.generate_duration_ms.value).toBe(1000);
+    expect(byId.generate_duration_ms.sampleSize).toBe(2);
+    expect(byId.generate_duration_ms.label).toMatch(/Gemini/i);
+    expect(byId.generate_to_export_ms.label).toMatch(/full-cycle|generate→export/i);
 
     const forB = await computeMetricsSummary(userB, from, to);
     const bById = Object.fromEntries(forB.metrics.map((m) => [m.id, m]));
@@ -137,6 +143,7 @@ describe('metrics summary aggregates (user-scoped)', () => {
     expect(bById.review_edit_proxy.value).toBe(1);
     // B's generate/export same timestamp → 0ms average
     expect(bById.generate_to_export_ms.value).toBe(0);
+    expect(bById.generate_duration_ms.value).toBe(3000);
   });
 
   it('does not leak other users rows into recentActions', async () => {

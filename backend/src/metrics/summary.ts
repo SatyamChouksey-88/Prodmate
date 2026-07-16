@@ -26,24 +26,18 @@ export async function computeMetricsSummary(
   const fromIso = from.toISOString();
   const toIso = to.toISOString();
 
-  const exportCount = await query<{ count: string }>(
-    `SELECT COUNT(*)::text AS count FROM audit_logs
-     WHERE user_id = $1 AND action = 'export'
-       AND created_at >= $2 AND created_at <= $3`,
-    [userId, fromIso, toIso]
-  );
-
-  const generateCount = await query<{ count: string }>(
-    `SELECT COUNT(*)::text AS count FROM audit_logs
-     WHERE user_id = $1 AND action = 'generate'
-       AND created_at >= $2 AND created_at <= $3`,
-    [userId, fromIso, toIso]
-  );
-
-  const editProxy = await query<{ count: string }>(
-    `SELECT COUNT(*)::text AS count FROM audit_logs
-     WHERE user_id = $1 AND action = 'review.edit'
-       AND created_at >= $2 AND created_at <= $3`,
+  // Single round-trip for the three action COUNTs (behavior-identical to prior queries).
+  const counts = await query<{
+    export_count: string;
+    generate_count: string;
+    edit_count: string;
+  }>(
+    `SELECT
+       COUNT(*) FILTER (WHERE action = 'export')::text AS export_count,
+       COUNT(*) FILTER (WHERE action = 'generate')::text AS generate_count,
+       COUNT(*) FILTER (WHERE action = 'review.edit')::text AS edit_count
+     FROM audit_logs
+     WHERE user_id = $1 AND created_at >= $2 AND created_at <= $3`,
     [userId, fromIso, toIso]
   );
 
@@ -77,6 +71,24 @@ export async function computeMetricsSummary(
       ? Math.round(msValues.reduce((a, b) => a + b, 0) / msValues.length)
       : null;
 
+  // True Gemini wall time from generate audit metadata.durationMs (not full-cycle).
+  const geminiDurations = await query<{ avg_ms: string | null; sample_size: string }>(
+    `SELECT
+       AVG((metadata->>'durationMs')::double precision)::text AS avg_ms,
+       COUNT(*)::text AS sample_size
+     FROM audit_logs
+     WHERE user_id = $1 AND action = 'generate'
+       AND created_at >= $2 AND created_at <= $3
+       AND metadata ? 'durationMs'
+       AND (metadata->>'durationMs') ~ '^[0-9]+(\\.[0-9]+)?$'`,
+    [userId, fromIso, toIso]
+  );
+  const geminiSample = Number(geminiDurations.rows[0]?.sample_size ?? 0);
+  const avgGeminiMs =
+    geminiSample > 0 && geminiDurations.rows[0]?.avg_ms != null
+      ? Math.round(Number(geminiDurations.rows[0].avg_ms))
+      : null;
+
   const recent = await query<{
     action: string;
     metadata: unknown;
@@ -90,6 +102,8 @@ export async function computeMetricsSummary(
     [userId, fromIso, toIso]
   );
 
+  const row = counts.rows[0];
+
   return {
     ok: true,
     range: { from: fromIso, to: toIso },
@@ -97,29 +111,37 @@ export async function computeMetricsSummary(
       {
         id: 'export_count',
         label: 'Exports completed',
-        value: Number(exportCount.rows[0]?.count ?? 0),
+        value: Number(row?.export_count ?? 0),
         kind: 'measured' as const,
         how: "COUNT of audit_logs where action = 'export' in range",
       },
       {
         id: 'generate_count',
         label: 'Generations completed',
-        value: Number(generateCount.rows[0]?.count ?? 0),
+        value: Number(row?.generate_count ?? 0),
         kind: 'measured' as const,
         how: "COUNT of audit_logs where action = 'generate' in range",
       },
       {
+        id: 'generate_duration_ms',
+        label: 'Avg Gemini generate duration (ms)',
+        value: avgGeminiMs,
+        kind: 'measured' as const,
+        how: "Mean of audit_logs.metadata.durationMs on action='generate' — server-measured LLM time only, not button-to-export",
+        sampleSize: geminiSample > 0 ? geminiSample : undefined,
+      },
+      {
         id: 'generate_to_export_ms',
-        label: 'Avg generate→export time (ms)',
+        label: 'Avg full-cycle generate→export time (ms)',
         value: avgGenerateToExportMs,
         kind: 'measured' as const,
-        how: 'Mean of (export.created_at − generate.created_at) joined on metadata.generationId; only paired rows',
+        how: 'Mean of (export.created_at − generate.created_at) joined on metadata.generationId; only paired rows — includes review idle time',
         sampleSize: msValues.length,
       },
       {
         id: 'review_edit_proxy',
         label: 'Review/refine edits',
-        value: Number(editProxy.rows[0]?.count ?? 0),
+        value: Number(row?.edit_count ?? 0),
         kind: 'proxy' as const,
         how: "COUNT of audit_logs where action = 'review.edit' (editKind 'field' = manual Draft blur; 'refine' = LLM refine) — refinement-effort proxy, not wall-clock editing time",
       },
