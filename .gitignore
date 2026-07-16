@@ -27,3 +27,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Local tooling / agent dirs (not app source)
+.claude/
+.cursor/
+backend/.data/
+coverage/

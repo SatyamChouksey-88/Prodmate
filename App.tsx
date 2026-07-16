@@ -85,13 +85,24 @@ const App: React.FC = () => {
     if (!apiMode) {
       const savedUser = localStorage.getItem('agile-gen-user');
       if (savedUser) {
-        handleLogin(JSON.parse(savedUser), false);
+        try {
+          const user = JSON.parse(savedUser) as User;
+          setCurrentUser(user);
+          const key = user.name;
+          const userHistory = localStorage.getItem(`agile-gen-history-${key}`);
+          setHistory(userHistory ? JSON.parse(userHistory) : []);
+          setTrackerConfig(loadLocalTrackerConfig(key));
+        } catch {
+          localStorage.removeItem('agile-gen-user');
+        }
       }
       return;
     }
 
+    let cancelled = false;
     (async () => {
       const user = await apiMe();
+      if (cancelled) return;
       if (user) {
         setCurrentUser(user);
         try {
@@ -103,6 +114,9 @@ const App: React.FC = () => {
       }
       setAuthReady(true);
     })();
+    return () => {
+      cancelled = true;
+    };
   }, [apiMode]);
 
   const handleLogin = (user: User | ApiUser, shouldSave: boolean = true) => {
@@ -173,20 +187,23 @@ const App: React.FC = () => {
       : currentUser.name
     : '';
 
-  const persistDemoHistory = (epics: Epic[], existingId?: string) => {
-    const newHistoryItem: HistoryItem = {
-      id: existingId || new Date().toISOString(),
-      title: epics[0]?.epic || 'Untitled Plan',
-      date: new Date().toLocaleString(),
-      data: epics,
-    };
-    setHistory((prev) => {
-      const updatedHistory = [newHistoryItem, ...prev.filter((h) => h.id !== newHistoryItem.id)];
-      localStorage.setItem(`agile-gen-history-${historyKey}`, JSON.stringify(updatedHistory));
-      return updatedHistory;
-    });
-    return newHistoryItem.id;
-  };
+  const persistDemoHistory = useCallback(
+    (epics: Epic[], existingId?: string) => {
+      const newHistoryItem: HistoryItem = {
+        id: existingId || new Date().toISOString(),
+        title: epics[0]?.epic || 'Untitled Plan',
+        date: new Date().toLocaleString(),
+        data: epics,
+      };
+      setHistory((prev) => {
+        const updatedHistory = [newHistoryItem, ...prev.filter((h) => h.id !== newHistoryItem.id)];
+        localStorage.setItem(`agile-gen-history-${historyKey}`, JSON.stringify(updatedHistory));
+        return updatedHistory;
+      });
+      return newHistoryItem.id;
+    },
+    [historyKey]
+  );
 
   const handleCancel = () => {
     abortRef.current?.abort();
@@ -247,7 +264,7 @@ const App: React.FC = () => {
         setProgressMessage('Review the plan, then export when ready.');
       } catch (err: unknown) {
         if (isAbortError(err)) {
-          setStatus(results ? 'ready' : 'idle');
+          setStatus('idle');
           setProgressMessage('Cancelled.');
           return;
         }
@@ -260,7 +277,7 @@ const App: React.FC = () => {
         if (abortRef.current === controller) abortRef.current = null;
       }
     },
-    [currentUser, clientIntegrationsEnabled, apiMode, historyKey]
+    [currentUser, clientIntegrationsEnabled, apiMode, persistDemoHistory]
   );
 
   const handleExport = useCallback(async () => {
@@ -335,7 +352,7 @@ const App: React.FC = () => {
     apiMode,
     trackerConfig,
     generationId,
-    historyKey,
+    persistDemoHistory,
   ]);
 
   const handleDeleteHistory = async (item: HistoryItem) => {

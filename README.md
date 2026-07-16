@@ -1,55 +1,95 @@
-🚀 AI-Powered Azure Boards Prompt Generator (Frontend UI)
-This project provides a React + TypeScript + Vite--based user interface for generating project management content using AI.\ The UI allows users to craft prompts that generate Epics, Features, and User Stories for Azure Boards.
+# ProdMate (Agile Story Generator)
 
-📂 Project Structure
-/components
-  ├─ ADOExportModal.tsx
-  ├─ Dashboard.tsx
-  ├─ DocumentationDisplay.tsx
-  ├─ ErrorMessages.tsx
-  ├─ Header.tsx
-  ├─ HistoryPanel.tsx
-  ├─ InputArea.tsx
-  ├─ Loader.tsx
-  ├─ Login.tsx
-  ├─ ResultsDisplay.tsx
-  ├─ SettingsPanel.tsx
-  ├─ WelcomeMessage.tsx
+AI Shadow Product Owner: turn a requirement into Epics / Features / User Stories with **Gemini**, then export to **Azure DevOps** or **Jira Cloud**.
 
-/services
-  ├─ adoService.ts
-  ├─ geminiService.ts
+This repo is a **Vite + React + TypeScript** frontend with an optional **Fastify + Postgres** backend (API mode). Google AI Studio is not used.
 
-App.tsx  
-index.tsx  
-index.html  
-vite.config.ts  
-package.json  
-tsconfig.json  
-🧠 How It Works
-User enters a description/prompt of the project.\
-The frontend calls AI to generate structured work items:
-Epics\
-Features\
-User Stories\
-User can then export these items to Azure Boards via Azure DevOps APIs.
-🏁 Getting Started
-Prerequisites
-Node.js (16+)
-npm
-Install Dependencies
+## Stack
+
+| Layer | Tech |
+|-------|------|
+| Frontend | React 19, Vite 6, Tailwind CSS v4 |
+| LLM | Google Gemini only (`@google/genai`) — server-side in API mode |
+| Trackers | Azure DevOps + Jira Cloud via `WorkItemTrackerAdapter` |
+| Backend (API mode) | Node.js, Fastify, PostgreSQL, bcrypt sessions |
+
+## Repository layout
+
+```
+.
+├── App.tsx                 # Main UI (auth, generate → review → export)
+├── components/             # Header, Login, InputArea, ResultsDisplay, Settings, History, …
+├── services/
+│   ├── apiClient.ts        # API mode client (VITE_API_URL)
+│   ├── geminiService.ts    # Demo-only browser Gemini (gated; insecure)
+│   ├── adoService.ts       # Thin ADO compat wrapper → trackers/
+│   └── trackers/           # AzureDevOpsAdapter, JiraAdapter, exportBacklog
+├── config/runtimeFlags.ts  # Demo insecure-client gate
+├── shared/htmlEscape.ts
+├── backend/                # Fastify API (auth, generate, export, history, audit)
+├── package.json            # Frontend
+└── tasks.md                # Build checklist (may live at workspace parent)
+```
+
+## Modes
+
+### API mode (recommended)
+
+1. Start Postgres and the backend (see `backend/README.md`).
+2. Frontend `.env.local`:
+
+```
+VITE_API_URL=http://localhost:4000
+```
+
+3. `npm install && npm run dev` — Gemini key and tracker secrets stay on the server.
+
+### Demo mode (local only)
+
+Without `VITE_API_URL`, the app can call Gemini/trackers from the browser **only** when both are true:
+
+- `npm run dev` (`import.meta.env.DEV`)
+- `VITE_ALLOW_INSECURE_CLIENT_LLM=true` in `.env.local`
+
+Not for shared or production builds.
+
+## Scripts (frontend)
+
+```bash
 npm install
-Start Development Server
-npm run dev
-🌐 Technologies Used
-React (TypeScript)
-Vite
-Azure DevOps REST API
-AI Model Integration (Gemini / OpenAI / Llama)
-📦 Build for Production
-npm run build
-🤝 Contribution
-Pull requests and suggestions are welcome.
+npm run dev          # Vite dev server
+npm run build        # Production build
+npm run lint         # ESLint
+npm run test         # Vitest
+npm run typecheck    # tsc --noEmit
+```
 
-📄 License
-This project is for personal or internal use unless otherwise specified.
+## Backend
+
+```bash
+cd backend
+cp .env.example .env   # fill DATABASE_URL, GEMINI_API_KEY, SESSION_SECRET, CREDENTIALS_ENCRYPTION_KEY
+npm install
+npm run migrate
+npm run dev            # default http://localhost:4000
+npm run typecheck
+npm test
+```
+
+Optional local Postgres without Docker: `npx tsx scripts/start-embedded-pg.ts`
+
+## Trackers
+
+- **Azure DevOps** — Epic → Feature → User Story (behavior preserved via `AzureDevOpsAdapter`; `adoService.ts` is a thin wrapper).
+- **Jira Cloud** — Epic → Story; Features are grouping labels (D8). Auth: email + API token (D4).
+
+See `services/trackers/ADDING_A_TRACKER.md`.
+
+## Known gaps
+
+- Live ADO/Jira export against real projects: code complete, **not live-verified** until test credentials exist (see `tasks.md` Phase 2).
+- Org-level multi-tenancy deferred (D9); isolation is per `user_id`.
+
+## License
+
+Internal / personal use unless otherwise specified.

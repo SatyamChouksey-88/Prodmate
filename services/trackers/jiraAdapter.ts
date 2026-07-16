@@ -165,7 +165,7 @@ export function createJiraAdapter(config: JiraConfig): WorkItemTrackerAdapter {
     async createUserStory(title, details: StoryDetails, parent: WorkItemRef) {
       const labels: string[] = [];
       let epicKey = parent.key;
-      let descriptionParts: string[] = [];
+      const descriptionParts: string[] = [];
 
       if (parent.virtualFeature) {
         labels.push(parent.virtualFeature.label);
