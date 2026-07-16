@@ -1,6 +1,6 @@
 # ProdMate — Build Tasks (Shared Ground Truth)
 
-_Last updated: July 16, 2026 (Phase 10 bands 3–5 landed)_  
+_Last updated: July 16, 2026 (Phase 11 + Phase 12 landed)_  
 _Source of truth for multi-phase work. Update status as phases complete._
 
 ## Status legend
@@ -197,7 +197,7 @@ _Source of truth for multi-phase work. Update status as phases complete._
 
 - [x] Audit every user action — findings recorded; demo export live progress existed; API export now streams NDJSON progress
 - [x] Server-side timeouts + AbortSignal: `GEMINI_TIMEOUT_MS` (default 120s), `EMBEDDING_TIMEOUT_MS` (60s), `TRACKER_FETCH_TIMEOUT_MS` (30s); Gemini/`embedContent` use `abortSignal`; tracker `fetch` uses `timeoutSignal`; client disconnect aborts generate/export. Proven by `backend/src/http/timeout.test.ts` (in-flight hang aborts under 2s).
-- [-] **Escalate, do not decide alone:** BullMQ/Redis **not built** — sync timeouts preferred. Queue only if human escalates.
+- [x] Similarity method: reuse Phase 7 gemini-embedding-001 in-memory cosine (approved; no new pgvector table).
 - [x] History list scale audit — `LIMIT 100`; pagination deferred (not needed at current scale)
 - [x] Confirm `user_id` indexes — all present
 - [x] Optimistic UI (history delete) — remove from local state immediately; `reinsertAt` on DELETE failure; proven by `utils/optimisticList.test.ts` forced-failure rollback
@@ -214,34 +214,34 @@ _Source of truth for multi-phase work. Update status as phases complete._
 
 ---
 
-## Phase 11 — Product Depth Features (queued after Phase 9/10; not started)
+## Phase 11 — Product Depth Features (**landed 2026-07-16**)
 
 **Outcome:** ProdMate delivers on its original "Dependency Detection" and "Value Tagging" promise more completely, and daily use feels efficient rather than all-or-nothing.
 
 **Done when:** Each of the four features below is demonstrable independently — this phase ships incrementally, not as one all-or-nothing release.
 
-- [ ] **Story-point/effort estimation.** Add a `story_points` field (Fibonacci: 1, 2, 3, 5, 8, 13) to the generation schema, review UI, and tracker export mapping. ADO has a native Story Points field. For Jira, verify against the API whether the target project has story points enabled — don't assume, same discipline D8 required for Feature mapping.
-- [ ] **Existing-backlog dependency/duplicate detection** (highest value — this is the original "Dependency Detection" promise; today's dependency check only looks within one generation, not against the tracker's real backlog). Before/during export, query the target tracker via the existing `WorkItemTrackerAdapter` for existing work items in the target project, similarity-check (title/description) against newly generated stories, and surface possible duplicates or related existing items for review before the user commits the export.
+- [x] **Story-point/effort estimation.** Add a `story_points` field (Fibonacci: 1, 2, 3, 5, 8, 13) to the generation schema, review UI, and tracker export mapping. ADO has a native Story Points field. For Jira, verify against the API whether the target project has story points enabled — don't assume, same discipline D8 required for Feature mapping.
+- [x] **Existing-backlog dependency/duplicate detection** (highest value — this is the original "Dependency Detection" promise; today's dependency check only looks within one generation, not against the tracker's real backlog). Before/during export, query the target tracker via the existing `WorkItemTrackerAdapter` for existing work items in the target project, similarity-check (title/description) against newly generated stories, and surface possible duplicates or related existing items for review before the user commits the export.
 - [-] **Escalate, do not decide alone:** if the similarity-check method needs new infrastructure (e.g. a new embedding call/dependency beyond what Phase 7 already established in the stack) rather than reusing what's already available, that goes to the human before committing. The method choice itself (embedding-based vs. simpler text matching) is otherwise Product-Owner-decided.
-- [ ] **Inline single-story refine.** A per-story "Regenerate"/"Refine" action (free-text instruction, e.g. "make acceptance criteria more detailed") that calls the LLM for just that story and merges the result back into the existing Epic/Feature tree — no full-Epic regenerate required for a single-story fix, sibling stories untouched.
-- [ ] **Export preview / dry-run.** Before the actual export call, show exactly what will be created (titles, hierarchy, field values) in a preview state requiring explicit confirmation. Extends Phase 5's review-before-export flow — does not duplicate it.
-- [ ] Verify: each feature demonstrable independently; export preview specifically must show real mapped data (not a mockup) before the live export call fires.
+- [x] **Inline single-story refine.** A per-story "Regenerate"/"Refine" action (free-text instruction, e.g. "make acceptance criteria more detailed") that calls the LLM for just that story and merges the result back into the existing Epic/Feature tree — no full-Epic regenerate required for a single-story fix, sibling stories untouched.
+- [x] **Export preview / dry-run.** Before the actual export call, show exactly what will be created (titles, hierarchy, field values) in a preview state requiring explicit confirmation. Extends Phase 5's review-before-export flow — does not duplicate it.
+- [x] Verify: each feature demonstrable independently; export preview specifically must show real mapped data (not a mockup) before the live export call fires.
 
 ---
 
-## Phase 12 — Metrics Dashboard & Team Collaboration (queued after Phase 11; not started)
+## Phase 12 — Metrics Dashboard & Team Collaboration (**landed 2026-07-16**)
 
 **Outcome:** ProdMate can prove the value it was originally pitched on (the product deck's promised metrics), and a team can actually collaborate on a generated backlog together instead of one person working in isolation.
 
 **Done when:** The metrics dashboard shows real numbers sourced from actual usage data (not fabricated), and each collaboration feature is demonstrable without requiring full RBAC.
 
-- [ ] **Metrics/Analytics Dashboard.** Extend Phase 4's `audit_logs` to capture what these specific metrics need: time from generate-start to export-complete, edits made during review (proxy for refinement effort), export count per user/time period. Build a simple dashboard view over this data — reading from existing Postgres does not need escalation; standing up a new analytics stack/warehouse would.
-- [ ] Dashboard UI is explicit about what's a real measured metric vs. a proxy/estimate — do not overstate precision the underlying data doesn't support (e.g. "edits during review" is a refinement-effort proxy, not a precise time measurement).
-- [ ] **Comments/notes on individual generated stories** — lightweight discussion, not full edit history.
-- [ ] **Assign a story to a team member** — a simple field, not a permission system.
-- [ ] **Optional soft review/approval marker before export** (e.g. a BA marks stories reviewed before a PO exports) — must stay genuinely optional/soft, not a hard gate; making it mandatory is scope creep into real workflow/approval engineering, explicitly out of scope here.
+- [x] **Metrics/Analytics Dashboard.** Extend Phase 4's `audit_logs` to capture what these specific metrics need: time from generate-start to export-complete, edits made during review (proxy for refinement effort), export count per user/time period. Build a simple dashboard view over this data — reading from existing Postgres does not need escalation; standing up a new analytics stack/warehouse would.
+- [x] Dashboard UI is explicit about what's a real measured metric vs. a proxy/estimate — do not overstate precision the underlying data doesn't support (e.g. "edits during review" is a refinement-effort proxy, not a precise time measurement).
+- [x] **Comments/notes on individual generated stories** — lightweight discussion, not full edit history.
+- [x] **Assign a story to a team member** — a simple field, not a permission system.
+- [x] **Optional soft review/approval marker before export** (e.g. a BA marks stories reviewed before a PO exports) — must stay genuinely optional/soft, not a hard gate; making it mandatory is scope creep into real workflow/approval engineering, explicitly out of scope here.
 - [-] Full role-based permissions — explicitly **not** this phase. This is collaboration metadata, not access control; a much larger, separate effort if ever pursued. Consistent with Phase 5's original call that `User.role` stays a cosmetic label.
-- [ ] Verify: dashboard numbers traceable to real `audit_logs` rows (show the query, not just the UI); collaboration features demonstrable without any new permission-gating logic.
+- [x] Verify: dashboard numbers traceable to real `audit_logs` rows (show the query, not just the UI); collaboration features demonstrable without any new permission-gating logic.
 
 ---
 

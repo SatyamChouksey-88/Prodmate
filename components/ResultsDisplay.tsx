@@ -1,7 +1,8 @@
 import React, { useEffect, useId, useState } from 'react';
 import type { Epic, Feature, UserStory, StoryPoints } from '../types';
 import { STORY_POINTS_OPTIONS } from '../types';
-import type { ExportedWorkItem, BacklogMatch } from '../services/apiClient';
+import type { ExportedWorkItem, BacklogMatch, StoryCollabItem } from '../services/apiClient';
+import StoryCollabPanel from './StoryCollabPanel';
 
 /**
  * Band 4 — local draft state (commit on blur), not React.memo.
@@ -110,7 +111,10 @@ const UserStoryCard: React.FC<{
   onChange: (story: UserStory) => void;
   onRefine?: (storyId: string, instruction: string) => Promise<void>;
   refining?: boolean;
-}> = ({ story, editable, onChange, onRefine, refining }) => {
+  generationId?: string;
+  collab?: StoryCollabItem | null;
+  onCollabChange?: (item: StoryCollabItem) => void;
+}> = ({ story, editable, onChange, onRefine, refining, generationId, collab, onCollabChange }) => {
   const storyFieldId = useId();
   const [showRefine, setShowRefine] = useState(false);
   const [instruction, setInstruction] = useState('');
@@ -268,6 +272,15 @@ const UserStoryCard: React.FC<{
           )}
         </div>
       )}
+
+      {generationId && (
+        <StoryCollabPanel
+          generationId={generationId}
+          storyId={story.id}
+          collab={collab}
+          onCollabChange={onCollabChange}
+        />
+      )}
     </div>
   );
 };
@@ -280,7 +293,21 @@ const FeatureCard: React.FC<{
   featureIndex: number;
   onRefineStory?: (epicIndex: number, featureIndex: number, storyId: string, instruction: string) => Promise<void>;
   refiningStoryId?: string | null;
-}> = ({ feature, editable, onChange, epicIndex, featureIndex, onRefineStory, refiningStoryId }) => {
+  generationId?: string;
+  collabByStory?: Record<string, StoryCollabItem>;
+  onCollabChange?: (item: StoryCollabItem) => void;
+}> = ({
+  feature,
+  editable,
+  onChange,
+  epicIndex,
+  featureIndex,
+  onRefineStory,
+  refiningStoryId,
+  generationId,
+  collabByStory,
+  onCollabChange,
+}) => {
   const [isOpen, setIsOpen] = useState(true);
   const titleId = useId();
   const descId = useId();
@@ -331,6 +358,9 @@ const FeatureCard: React.FC<{
               story={story}
               editable={editable}
               refining={refiningStoryId === story.id}
+              generationId={generationId}
+              collab={collabByStory?.[story.id] ?? null}
+              onCollabChange={onCollabChange}
               onRefine={
                 onRefineStory
                   ? (storyId, instruction) =>
@@ -356,7 +386,20 @@ const EpicCard: React.FC<{
   onChange: (epic: Epic) => void;
   onRefineStory?: (epicIndex: number, featureIndex: number, storyId: string, instruction: string) => Promise<void>;
   refiningStoryId?: string | null;
-}> = ({ epic, index, editable, onChange, onRefineStory, refiningStoryId }) => {
+  generationId?: string;
+  collabByStory?: Record<string, StoryCollabItem>;
+  onCollabChange?: (item: StoryCollabItem) => void;
+}> = ({
+  epic,
+  index,
+  editable,
+  onChange,
+  onRefineStory,
+  refiningStoryId,
+  generationId,
+  collabByStory,
+  onCollabChange,
+}) => {
   const [isOpen, setIsOpen] = useState(index === 0);
   const titleId = useId();
   const descId = useId();
@@ -410,6 +453,9 @@ const EpicCard: React.FC<{
               featureIndex={i}
               onRefineStory={onRefineStory}
               refiningStoryId={refiningStoryId}
+              generationId={generationId}
+              collabByStory={collabByStory}
+              onCollabChange={onCollabChange}
               onChange={(next) => {
                 const features = epic.features.map((f, fi) => (fi === i ? next : f));
                 onChange({ ...epic, features });
@@ -440,11 +486,18 @@ export interface ResultsDisplayProps {
   backlogScanned?: number | null;
   onRefineStory?: (epicIndex: number, featureIndex: number, storyId: string, instruction: string) => Promise<void>;
   refiningStoryId?: string | null;
-  exportPreview?: { provider: string; lines: Array<{ kind: string; title: string; parentHint?: string; fields: string[] }> } | null;
+  exportPreview?: {
+    provider: string;
+    lines: Array<{ kind: string; title: string; parentHint?: string; fields: string[] }>;
+  } | null;
   onRequestExport?: () => void;
   onConfirmExport?: () => void;
   onDismissPreview?: () => void;
   isLoadingPreview?: boolean;
+  generationId?: string;
+  collabByStory?: Record<string, StoryCollabItem>;
+  onCollabChange?: (item: StoryCollabItem) => void;
+  reviewHint?: string | null;
 }
 
 const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
@@ -469,6 +522,10 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
   onConfirmExport,
   onDismissPreview,
   isLoadingPreview = false,
+  generationId,
+  collabByStory,
+  onCollabChange,
+  reviewHint = null,
 }) => {
   return (
     <div className="space-y-6 animate-fade-in">
@@ -515,6 +572,11 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
               </button>
             </div>
           </div>
+          {reviewHint && (
+            <p className="text-xs text-foreground-muted" role="note">
+              {reviewHint}
+            </p>
+          )}
           {isExporting && (
             <p className="text-xs text-warning" role="note">
               Cancelling aborts the in-flight request so the server usually stops creating further
@@ -643,6 +705,9 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
           editable={editable}
           onRefineStory={onRefineStory}
           refiningStoryId={refiningStoryId}
+          generationId={generationId}
+          collabByStory={collabByStory}
+          onCollabChange={onCollabChange}
           onChange={(next) => {
             if (!onResultsChange) return;
             onResultsChange(results.map((e, ei) => (ei === i ? next : e)));

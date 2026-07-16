@@ -9,6 +9,7 @@ import { trackerSettingsRoutes } from './routes/trackerSettings.js';
 import { historyRoutes } from './routes/history.js';
 import { knowledgeRoutes } from './knowledge/routes.js';
 import { metricsRoutes } from './routes/metrics.js';
+import { collabRoutes } from './routes/collab.js';
 import { registerRateLimits } from './rateLimit.js';
 
 async function main() {
@@ -62,6 +63,7 @@ async function main() {
   await historyRoutes(app);
   await knowledgeRoutes(app, { knowledgeIngestLimit });
   await metricsRoutes(app);
+  await collabRoutes(app);
 
   await app.listen({ port: config.port, host: '0.0.0.0' });
   console.log(`ProdMate backend listening on :${config.port}`);

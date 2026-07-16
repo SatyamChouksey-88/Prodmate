@@ -29,9 +29,11 @@ import {
   apiBacklogMatches,
   apiRefineStory,
   apiExportPreview,
+  apiGetGenerationCollab,
   type ApiUser,
   type ExportedWorkItem,
   type BacklogMatch,
+  type StoryCollabItem,
 } from './services/apiClient';
 import Header from './components/Header';
 import InputArea from './components/InputArea';
@@ -112,10 +114,43 @@ const App: React.FC = () => {
     lines: PreviewLine[];
   } | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
+  const [collabByStory, setCollabByStory] = useState<Record<string, StoryCollabItem>>({});
   const abortRef = useRef<AbortController | null>(null);
 
   const clientIntegrationsEnabled = !apiMode && isInsecureClientIntegrationsEnabled();
   const canUseIntegrations = apiMode || clientIntegrationsEnabled;
+
+  useEffect(() => {
+    if (!apiMode || !generationId) {
+      setCollabByStory({});
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const items = await apiGetGenerationCollab(generationId);
+        if (cancelled) return;
+        const map: Record<string, StoryCollabItem> = {};
+        for (const item of items) map[item.storyId] = item;
+        setCollabByStory(map);
+      } catch {
+        if (!cancelled) setCollabByStory({});
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [apiMode, generationId]);
+
+  const reviewHint = (() => {
+    if (!results || !generationId) return null;
+    const storyIds = results.flatMap((e) =>
+      e.features.flatMap((f) => f.user_stories.map((s) => s.id))
+    );
+    if (!storyIds.length) return null;
+    const reviewed = storyIds.filter((id) => collabByStory[id]?.reviewedAt).length;
+    return `${reviewed}/${storyIds.length} stories marked reviewed (optional — export is never blocked).`;
+  })();
 
   useEffect(() => {
     if (!apiMode) {
@@ -640,6 +675,12 @@ const App: React.FC = () => {
                   backlogScanned={backlogScanned}
                   onRefineStory={apiMode ? handleRefineStory : undefined}
                   refiningStoryId={refiningStoryId}
+                  generationId={apiMode ? generationId : undefined}
+                  collabByStory={collabByStory}
+                  onCollabChange={(item) =>
+                    setCollabByStory((prev) => ({ ...prev, [item.storyId]: item }))
+                  }
+                  reviewHint={reviewHint}
                 />
               )}
               {!isLoading && status !== 'error' && !results && <WelcomeMessage />}

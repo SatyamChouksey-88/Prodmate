@@ -258,6 +258,56 @@ export async function apiGetMetricsSummary(from?: string, to?: string): Promise<
   return api(`/api/metrics/summary${q ? `?${q}` : ''}`);
 }
 
+export async function apiListStoryNotes(
+  generationId: string,
+  storyId: string
+): Promise<Array<{ id: string; body: string; authorUserId: string; createdAt: string }>> {
+  const data = await api<{
+    notes: Array<{ id: string; body: string; authorUserId: string; createdAt: string }>;
+  }>(`/api/generations/${encodeURIComponent(generationId)}/stories/${encodeURIComponent(storyId)}/notes`);
+  return data.notes;
+}
+
+export async function apiAddStoryNote(
+  generationId: string,
+  storyId: string,
+  body: string
+): Promise<{ id: string; body: string; authorUserId: string; createdAt: string }> {
+  const data = await api<{
+    note: { id: string; body: string; authorUserId: string; createdAt: string };
+  }>(`/api/generations/${encodeURIComponent(generationId)}/stories/${encodeURIComponent(storyId)}/notes`, {
+    method: 'POST',
+    body: JSON.stringify({ body }),
+  });
+  return data.note;
+}
+
+export type StoryCollabItem = {
+  storyId: string;
+  assigneeLabel: string | null;
+  reviewedAt: string | null;
+  reviewedByUserId: string | null;
+};
+
+export async function apiGetGenerationCollab(generationId: string): Promise<StoryCollabItem[]> {
+  const data = await api<{ items: StoryCollabItem[] }>(
+    `/api/generations/${encodeURIComponent(generationId)}/collab`
+  );
+  return data.items;
+}
+
+export async function apiPatchStoryCollab(
+  generationId: string,
+  storyId: string,
+  patch: { assigneeLabel?: string | null; reviewed?: boolean }
+): Promise<StoryCollabItem> {
+  const data = await api<{ item: StoryCollabItem }>(
+    `/api/generations/${encodeURIComponent(generationId)}/stories/${encodeURIComponent(storyId)}/collab`,
+    { method: 'PATCH', body: JSON.stringify(patch) }
+  );
+  return data.item;
+}
+
 export async function apiGetTrackerSettings(): Promise<TrackerConfig | null> {
   const data = await api<{ config: TrackerConfig | null }>('/api/tracker/settings');
   return data.config;
