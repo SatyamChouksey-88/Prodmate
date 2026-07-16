@@ -5,9 +5,16 @@ interface InputAreaProps {
   isLoading: boolean;
   isAdoConfigured: boolean;
   integrationsEnabled: boolean;
+  onCancel?: () => void;
 }
 
-const InputArea: React.FC<InputAreaProps> = ({ onGenerate, isLoading, isAdoConfigured, integrationsEnabled }) => {
+const InputArea: React.FC<InputAreaProps> = ({
+  onGenerate,
+  isLoading,
+  isAdoConfigured,
+  integrationsEnabled,
+  onCancel,
+}) => {
   const [text, setText] = useState<string>('');
   const [knowledgeBase, setKnowledgeBase] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -23,7 +30,7 @@ const InputArea: React.FC<InputAreaProps> = ({ onGenerate, isLoading, isAdoConfi
       reader.readAsText(file);
     }
   };
-  
+
   const triggerFileSelect = () => {
     fileInputRef.current?.click();
   };
@@ -32,17 +39,14 @@ const InputArea: React.FC<InputAreaProps> = ({ onGenerate, isLoading, isAdoConfi
     e.preventDefault();
     onGenerate(text, knowledgeBase);
   };
-  
-  const isGenerateDisabled =
-    isLoading ||
-    !text ||
-    !integrationsEnabled ||
-    (integrationsEnabled && !isAdoConfigured);
+
+  // Tracker config is required for export, not for generate (review-before-export).
+  const isGenerateDisabled = isLoading || !text || !integrationsEnabled;
 
   const generateTitle = !integrationsEnabled
     ? 'Client integrations disabled — enable only via .env.local for local demos (npm run dev)'
     : !isAdoConfigured
-      ? 'Please configure work tracker settings first'
+      ? 'You can generate now; configure tracker settings before exporting'
       : '';
 
   return (
@@ -101,11 +105,20 @@ const InputArea: React.FC<InputAreaProps> = ({ onGenerate, isLoading, isAdoConfi
                 ) : (
                 <>
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" /></svg>
-                    Generate & Export
+                    Generate plan
                 </>
                 )}
             </button>
           </div>
+          {isLoading && onCancel && (
+            <button
+              type="button"
+              onClick={onCancel}
+              className="w-full sm:w-auto bg-surface-muted text-foreground font-semibold py-3 px-6 rounded-lg border border-border hover:bg-border"
+            >
+              Cancel
+            </button>
+          )}
           <input
             type="file"
             ref={fileInputRef}
