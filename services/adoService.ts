@@ -1,6 +1,7 @@
 /**
  * Backward-compatible ADO surface.
  * Prefer services/trackers for new code (multi-provider).
+ * ADO behavior is preserved via AzureDevOpsAdapter — do not delete this module.
  */
 import type { Epic } from '../types';
 import {
@@ -8,6 +9,7 @@ import {
   exportToTracker,
   type AzureDevOpsConfig,
   type ADOConfig as TrackerADOConfig,
+  type ExportResult,
 } from './trackers';
 
 export type { ADOConfig } from './trackers';
@@ -29,6 +31,6 @@ export async function exportToADO(
   config: TrackerADOConfig,
   epics: Epic[],
   onProgress: (message: string) => void
-): Promise<void> {
-  await exportToTracker(toAzureConfig(config), epics, onProgress);
+): Promise<ExportResult> {
+  return exportToTracker(toAzureConfig(config), epics, onProgress);
 }

@@ -32,6 +32,14 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
 
 export type ApiUser = User & { id: string; email: string };
 
+export type ExportedWorkItem = {
+  kind: 'epic' | 'feature' | 'story';
+  title: string;
+  id: string;
+  url: string;
+  key?: string;
+};
+
 export async function apiRegister(input: {
   email: string;
   password: string;
@@ -68,18 +76,25 @@ export async function apiMe(): Promise<ApiUser | null> {
 
 export async function apiGenerate(
   requirement: string,
-  knowledgeBase: string
+  knowledgeBase: string,
+  signal?: AbortSignal
 ): Promise<{ generationId: string; epics: Epic[] }> {
   return api('/api/generate', {
     method: 'POST',
     body: JSON.stringify({ requirement, knowledgeBase }),
+    signal,
   });
 }
 
-export async function apiExport(epics: Epic[], generationId?: string): Promise<void> {
-  await api('/api/export', {
+export async function apiExport(
+  epics: Epic[],
+  generationId?: string,
+  signal?: AbortSignal
+): Promise<{ ok: true; progress: string[]; created: ExportedWorkItem[] }> {
+  return api('/api/export', {
     method: 'POST',
     body: JSON.stringify({ epics, generationId }),
+    signal,
   });
 }
 
@@ -114,4 +129,12 @@ export async function apiGetHistory(): Promise<HistoryItem[]> {
     date: item.date,
     data: item.data,
   }));
+}
+
+export async function apiDeleteHistoryItem(id: string): Promise<void> {
+  await api(`/api/history/${encodeURIComponent(id)}`, { method: 'DELETE' });
+}
+
+export async function apiClearHistory(): Promise<void> {
+  await api('/api/history', { method: 'DELETE' });
 }

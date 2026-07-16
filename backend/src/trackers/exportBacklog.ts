@@ -17,17 +17,29 @@ export type EpicPayload = {
   }>;
 };
 
+export type CreatedWorkItem = {
+  kind: 'epic' | 'feature' | 'story';
+  title: string;
+  ref: WorkItemRef;
+};
+
+export type ExportResult = {
+  created: CreatedWorkItem[];
+};
+
 export async function exportBacklog(
   adapter: WorkItemTrackerAdapter,
   epics: EpicPayload[],
   onProgress: (message: string) => void
-): Promise<void> {
+): Promise<ExportResult> {
   const storyIdToRef = new Map<string, WorkItemRef>();
+  const created: CreatedWorkItem[] = [];
   onProgress(`Starting export via ${adapter.provider}...`);
 
   for (const epic of epics) {
     onProgress(`Creating Epic: "${epic.epic}"`);
     const epicRef = await adapter.createEpic(epic.epic, epic.epic_description);
+    created.push({ kind: 'epic', title: epic.epic, ref: epicRef });
 
     for (const feature of epic.features) {
       onProgress(
@@ -40,8 +52,8 @@ export async function exportBacklog(
         feature.feature_description,
         epicRef
       );
-
       if (!featureRef.virtualFeature) {
+        created.push({ kind: 'feature', title: feature.feature, ref: featureRef });
         await adapter.linkParent(featureRef, epicRef);
       }
 
@@ -56,6 +68,7 @@ export async function exportBacklog(
           },
           featureRef
         );
+        created.push({ kind: 'story', title: story.story, ref: storyRef });
 
         if (!featureRef.virtualFeature) {
           await adapter.linkParent(storyRef, featureRef);
@@ -89,4 +102,5 @@ export async function exportBacklog(
   }
 
   onProgress('Export complete!');
+  return { created };
 }

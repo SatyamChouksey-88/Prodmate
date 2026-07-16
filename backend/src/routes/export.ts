@@ -35,15 +35,30 @@ export async function exportRoutes(app: FastifyInstance) {
     const progress: string[] = [];
 
     try {
-      await exportBacklog(adapter, parsed.data.epics as Parameters<typeof exportBacklog>[1], (msg) => {
-        progress.push(msg);
-      });
+      const { created } = await exportBacklog(
+        adapter,
+        parsed.data.epics as Parameters<typeof exportBacklog>[1],
+        (msg) => {
+          progress.push(msg);
+        }
+      );
       await writeAudit(request.user!.id, 'export', {
         provider: trackerConfig.provider,
         generationId: parsed.data.generationId,
         epicCount: parsed.data.epics.length,
+        createdCount: created.length,
       });
-      return { ok: true, progress };
+      return {
+        ok: true,
+        progress,
+        created: created.map((item) => ({
+          kind: item.kind,
+          title: item.title,
+          id: item.ref.id,
+          url: item.ref.url,
+          key: item.ref.key,
+        })),
+      };
     } catch (err) {
       console.error(err);
       return reply.code(502).send({

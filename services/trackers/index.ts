@@ -20,6 +20,7 @@ export {
 } from './types';
 
 export { exportBacklog } from './exportBacklog';
+export type { CreatedWorkItem, ExportResult } from './exportBacklog';
 
 export function createTrackerAdapter(config: TrackerConfig): WorkItemTrackerAdapter {
   if (config.provider === 'jira') {
@@ -36,7 +37,7 @@ export async function exportToTracker(
   config: TrackerConfig,
   epics: Parameters<typeof exportBacklog>[1],
   onProgress: (message: string) => void
-): Promise<void> {
+): Promise<import('./exportBacklog').ExportResult> {
   const adapter = createTrackerAdapter(config);
-  await exportBacklog(adapter, epics, onProgress);
+  return exportBacklog(adapter, epics, onProgress);
 }

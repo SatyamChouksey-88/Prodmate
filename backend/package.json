@@ -23,6 +23,7 @@
     "@types/bcrypt": "^5.0.2",
     "@types/node": "^22.14.0",
     "@types/pg": "^8.15.2",
+    "embedded-postgres": "^18.4.0-beta.17",
     "tsx": "^4.19.4",
     "typescript": "~5.8.2"
   }
