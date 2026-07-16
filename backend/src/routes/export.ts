@@ -47,9 +47,33 @@ type NdjsonEvent =
     }
   | { type: 'error'; error: string; progress: string[] };
 
+type BacklogNdjsonEvent =
+  | { type: 'progress'; message: string }
+  | {
+      type: 'done';
+      ok: true;
+      progress: string[];
+      scanned: number;
+      limit: number;
+      matches: Array<{
+        storyId: string;
+        storyText: string;
+        kind: 'duplicate' | 'related';
+        score: number;
+        existing: {
+          id: string;
+          title: string;
+          description?: string;
+          url: string;
+          key?: string;
+        };
+      }>;
+    }
+  | { type: 'error'; error: string; progress: string[] };
+
 export async function exportRoutes(
   app: FastifyInstance,
-  opts: { exportLimit: RateLimitPreHandler }
+  opts: { exportLimit: RateLimitPreHandler; backlogCheckLimit: RateLimitPreHandler }
 ) {
   app.post(
     '/api/export',
@@ -163,7 +187,7 @@ export async function exportRoutes(
 
   app.post(
     '/api/export/backlog-matches',
-    { preHandler: [requireAuth, opts.exportLimit] },
+    { preHandler: [requireAuth, opts.backlogCheckLimit] },
     async (request, reply) => {
       const parsed = matchSchema.safeParse(request.body);
       if (!parsed.success) {
@@ -194,30 +218,73 @@ export async function exportRoutes(
       const onClose = () => abort.abort();
       request.raw.on('close', onClose);
 
-      try {
-        const adapter = createTrackerAdapter(trackerConfig, { signal: abort.signal });
-        const existing = await adapter.listExistingItems({ limit: BACKLOG_LIST_LIMIT });
-        const matches = await findBacklogMatches(stories, existing, abort.signal);
-        return {
-          ok: true,
-          scanned: existing.length,
-          limit: BACKLOG_LIST_LIMIT,
-          matches: matches.map((m) => ({
-            storyId: m.storyId,
-            storyText: m.storyText,
-            kind: m.kind,
-            score: Math.round(m.score * 1000) / 1000,
-            existing: m.existing,
-          })),
-        };
-      } catch (err) {
-        console.error(err);
-        return reply.code(502).send({
-          error: err instanceof Error ? err.message : 'Backlog match failed',
-        });
-      } finally {
-        request.raw.off('close', onClose);
-      }
+      const progress: string[] = [];
+      const stream = new PassThrough();
+
+      const writeLine = (event: BacklogNdjsonEvent) => {
+        if (!stream.destroyed) {
+          stream.write(`${JSON.stringify(event)}\n`);
+        }
+      };
+
+      void (async () => {
+        try {
+          writeLine({ type: 'progress', message: 'Loading tracker backlog…' });
+          progress.push('Loading tracker backlog…');
+
+          const adapter = createTrackerAdapter(trackerConfig, { signal: abort.signal });
+          const existing = await adapter.listExistingItems({ limit: BACKLOG_LIST_LIMIT });
+
+          const listMsg = `Loaded ${existing.length} backlog item${existing.length === 1 ? '' : 's'}.`;
+          progress.push(listMsg);
+          writeLine({ type: 'progress', message: listMsg });
+
+          const matches = await findBacklogMatches(
+            stories,
+            existing,
+            abort.signal,
+            (msg) => {
+              progress.push(msg);
+              writeLine({ type: 'progress', message: msg });
+            }
+          );
+
+          await writeAudit(request.user!.id, 'export.backlog-matches', {
+            provider: trackerConfig.provider,
+            scanned: existing.length,
+            matchCount: matches.length,
+            storyCount: stories.length,
+          });
+
+          writeLine({
+            type: 'done',
+            ok: true,
+            progress,
+            scanned: existing.length,
+            limit: BACKLOG_LIST_LIMIT,
+            matches: matches.map((m) => ({
+              storyId: m.storyId,
+              storyText: m.storyText,
+              kind: m.kind,
+              score: Math.round(m.score * 1000) / 1000,
+              existing: m.existing,
+            })),
+          });
+        } catch (err) {
+          console.error(err);
+          const message = isAbortError(err)
+            ? 'Backlog check aborted'
+            : err instanceof Error
+              ? err.message
+              : 'Backlog match failed';
+          writeLine({ type: 'error', error: message, progress });
+        } finally {
+          request.raw.off('close', onClose);
+          stream.end();
+        }
+      })();
+
+      return reply.type('application/x-ndjson; charset=utf-8').send(stream);
     }
   );
 

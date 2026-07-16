@@ -15,6 +15,7 @@ export async function registerRateLimits(app: FastifyInstance): Promise<{
   generateLimit: RateLimitPreHandler;
   exportLimit: RateLimitPreHandler;
   knowledgeIngestLimit: RateLimitPreHandler;
+  backlogCheckLimit: RateLimitPreHandler;
 }> {
   await app.register(rateLimit, { global: false });
 
@@ -34,6 +35,12 @@ export async function registerRateLimits(app: FastifyInstance): Promise<{
     max: config.rateLimitKnowledgeIngestMax,
     timeWindow: '1 hour',
     keyGenerator: (request) => `knowledge-ingest:${request.user!.id}`,
+  });
+
+  const checkBacklogCheck = app.createRateLimit({
+    max: config.rateLimitBacklogCheckMax,
+    timeWindow: '1 hour',
+    keyGenerator: (request) => `backlog-check:${request.user!.id}`,
   });
 
   const generateLimit: RateLimitPreHandler = async (request, reply) => {
@@ -66,5 +73,15 @@ export async function registerRateLimits(app: FastifyInstance): Promise<{
     }
   };
 
-  return { generateLimit, exportLimit, knowledgeIngestLimit };
+  const backlogCheckLimit: RateLimitPreHandler = async (request, reply) => {
+    const result = await checkBacklogCheck(request);
+    if (result.isAllowed === false && result.isExceeded) {
+      return reply.code(429).send({
+        error: `Backlog check rate limit exceeded (${config.rateLimitBacklogCheckMax}/hour). Try again later.`,
+        ttlMs: result.ttl,
+      });
+    }
+  };
+
+  return { generateLimit, exportLimit, knowledgeIngestLimit, backlogCheckLimit };
 }

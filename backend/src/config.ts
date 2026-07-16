@@ -34,6 +34,11 @@ export const config = {
   rateLimitExportMax: optionalInt('RATE_LIMIT_EXPORT_PER_HOUR', 30),
   /** Per-user knowledge ingest cap per hour (embedding Gemini cost). */
   rateLimitKnowledgeIngestMax: optionalInt('RATE_LIMIT_KNOWLEDGE_INGEST_PER_HOUR', 20),
+  /**
+   * Per-user backlog-check cap per hour.
+   * Costlier than export (up to 100+ embedding calls); keep tighter than exportLimit.
+   */
+  rateLimitBacklogCheckMax: optionalInt('RATE_LIMIT_BACKLOG_CHECK_PER_HOUR', 10),
   /** Soft retention for audit_logs; pruned via `npm run audit:prune`. */
   auditRetentionDays: optionalInt('AUDIT_RETENTION_DAYS', 90),
   /** Gemini generateContent ceiling (ms). */

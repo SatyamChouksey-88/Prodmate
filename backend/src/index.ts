@@ -54,11 +54,12 @@ async function main() {
 
   app.get('/api/health', async () => ({ ok: true, env: config.nodeEnv }));
 
-  const { generateLimit, exportLimit, knowledgeIngestLimit } = await registerRateLimits(app);
+  const { generateLimit, exportLimit, knowledgeIngestLimit, backlogCheckLimit } =
+    await registerRateLimits(app);
 
   await authRoutes(app);
   await generateRoutes(app, { generateLimit });
-  await exportRoutes(app, { exportLimit });
+  await exportRoutes(app, { exportLimit, backlogCheckLimit });
   await trackerSettingsRoutes(app);
   await historyRoutes(app);
   await knowledgeRoutes(app, { knowledgeIngestLimit });
