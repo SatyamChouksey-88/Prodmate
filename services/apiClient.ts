@@ -236,6 +236,28 @@ export async function apiBacklogMatches(
   });
 }
 
+export type MetricsSummary = {
+  ok: true;
+  range: { from: string; to: string };
+  metrics: Array<{
+    id: string;
+    label: string;
+    value: number | null;
+    kind: 'measured' | 'proxy';
+    how: string;
+    sampleSize?: number;
+  }>;
+  recentActions: Array<{ action: string; metadata: unknown; created_at: string }>;
+};
+
+export async function apiGetMetricsSummary(from?: string, to?: string): Promise<MetricsSummary> {
+  const params = new URLSearchParams();
+  if (from) params.set('from', from);
+  if (to) params.set('to', to);
+  const q = params.toString();
+  return api(`/api/metrics/summary${q ? `?${q}` : ''}`);
+}
+
 export async function apiGetTrackerSettings(): Promise<TrackerConfig | null> {
   const data = await api<{ config: TrackerConfig | null }>('/api/tracker/settings');
   return data.config;

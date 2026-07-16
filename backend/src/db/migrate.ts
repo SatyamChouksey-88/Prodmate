@@ -17,7 +17,9 @@ async function migrate() {
   await pool.query(phase7);
   const phase9 = fs.readFileSync(path.join(__dirname, 'schema_phase9.sql'), 'utf8');
   await pool.query(phase9);
-  console.log('Migration complete (phase 3 + 4 + 8 + 7 + 9).');
+  const phase12 = fs.readFileSync(path.join(__dirname, 'schema_phase12.sql'), 'utf8');
+  await pool.query(phase12);
+  console.log('Migration complete (phase 3 + 4 + 8 + 7 + 9 + 12).');
   await pool.end();
 }
 

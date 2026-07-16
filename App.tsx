@@ -43,6 +43,7 @@ import Login from './components/Login';
 import HistoryPanel from './components/HistoryPanel';
 import KnowledgePanel from './components/KnowledgePanel';
 import SettingsPanel from './components/SettingsPanel';
+import MetricsDashboard from './components/MetricsDashboard';
 import { removeById, reinsertAt } from './utils/optimisticList';
 
 /** generating → ready (review) → exporting → success | error (retry keeps results) */
@@ -576,6 +577,7 @@ const App: React.FC = () => {
               integrationsEnabled={canUseIntegrations}
               useApi={apiMode}
             />
+            {apiMode && <MetricsDashboard />}
             {apiMode && <KnowledgePanel />}
             <HistoryPanel
               history={history}

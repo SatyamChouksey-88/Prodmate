@@ -35,11 +35,14 @@ export async function generateRoutes(
       }
 
       try {
+        const startedAt = new Date().toISOString();
         const abort = new AbortController();
         const onClose = () => {
           if (!reply.sent) abort.abort();
         };
         request.raw.on('close', onClose);
+
+        await writeAudit(request.user!.id, 'generate.start', { startedAt });
 
         const { knowledgeBase, retrievedCount } = await buildKnowledgeContext(
           request.user!.id,
@@ -62,10 +65,13 @@ export async function generateRoutes(
           [request.user!.id, title, JSON.stringify(epics)]
         );
         const generationId = insert.rows[0].id;
+        const finishedAt = Date.now();
         await writeAudit(request.user!.id, 'generate', {
           generationId,
           epicCount: epics.length,
           retrievedChunkCount: retrievedCount,
+          startedAt,
+          durationMs: finishedAt - Date.parse(startedAt),
         });
         return { generationId, epics, retrievedChunkCount: retrievedCount };
       } catch (err) {
