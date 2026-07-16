@@ -1,11 +1,9 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import type { Epic } from '../types';
-
-if (!process.env.API_KEY) {
-    throw new Error("API_KEY environment variable is not set.");
-}
-
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+import {
+  assertInsecureClientIntegrationsAllowed,
+  isInsecureClientIntegrationsEnabled,
+} from '../config/runtimeFlags';
 
 const responseSchema = {
   type: Type.ARRAY,
@@ -81,7 +79,27 @@ const responseSchema = {
   },
 };
 
+function getGeminiClient(): GoogleGenAI {
+  assertInsecureClientIntegrationsAllowed('Story generation');
+
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error(
+      'VITE_GEMINI_API_KEY is not set. For local demos only, add it to .env.local ' +
+      'together with VITE_ALLOW_INSECURE_CLIENT_LLM=true. Shared deploys must use a backend proxy.'
+    );
+  }
+
+  return new GoogleGenAI({ apiKey });
+}
+
 export async function generateStories(userInput: string, knowledgeBase: string): Promise<Epic[]> {
+    if (!isInsecureClientIntegrationsEnabled()) {
+      assertInsecureClientIntegrationsAllowed('Story generation');
+    }
+
+    const ai = getGeminiClient();
+
     const prompt = `
       You are an expert AI Shadow Product Owner. Your primary function is to assist agile teams by reducing dependency on the human Product Owner for day-to-day backlog grooming.
       
@@ -130,6 +148,9 @@ export async function generateStories(userInput: string, knowledgeBase: string):
         return parsedResponse as Epic[];
 
     } catch (error) {
+        if (error instanceof Error && error.message.includes('blocked')) {
+          throw error;
+        }
         console.error("Error calling Gemini API:", error);
         throw new Error("Failed to generate stories from the API.");
     }
