@@ -56,6 +56,9 @@ function storyMarkdown(details: StoryDetails): string | undefined {
       parts.push(`- ${ac}`);
     }
   }
+  if (details.storyPoints != null) {
+    parts.push(`Story points: ${details.storyPoints}`);
+  }
   return parts.length ? parts.join('\n\n') : undefined;
 }
 

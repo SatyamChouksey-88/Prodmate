@@ -60,6 +60,57 @@ export function createJiraAdapter(
   const base = sanitizeBaseUrl(config.baseUrl);
   const storyType = config.storyIssueType?.trim() || 'Story';
   const auth = getAuthHeader(config.email, config.apiToken);
+  let storyPointsFieldPromise: Promise<string | null> | null = null;
+
+  async function resolveStoryPointsField(): Promise<string | null> {
+    if (!storyPointsFieldPromise) {
+      storyPointsFieldPromise = (async () => {
+        const fieldsRes = await jiraFetch(
+          `${base}/rest/api/3/field`,
+          { method: 'GET', headers: { Authorization: auth, Accept: 'application/json' } },
+          opts.signal
+        );
+        if (!fieldsRes.ok) {
+          console.warn(`Jira field list failed (${fieldsRes.status}); skipping story points.`);
+          return null;
+        }
+        const fields = (await fieldsRes.json()) as Array<{
+          id: string;
+          name?: string;
+        }>;
+        const match = fields.find((f) => {
+          const name = (f.name ?? '').toLowerCase();
+          return name === 'story points' || name === 'story point estimate';
+        });
+        if (!match) {
+          console.warn('Jira instance has no Story Points field; skipping points.');
+          return null;
+        }
+        // Confirm the field appears on createmeta for this project + story type when possible.
+        const metaRes = await jiraFetch(
+          `${base}/rest/api/3/issue/createmeta?projectKeys=${encodeURIComponent(config.projectKey)}&issuetypeNames=${encodeURIComponent(storyType)}&expand=projects.issuetypes.fields`,
+          { method: 'GET', headers: { Authorization: auth, Accept: 'application/json' } },
+          opts.signal
+        );
+        if (metaRes.ok) {
+          const meta = (await metaRes.json()) as {
+            projects?: Array<{
+              issuetypes?: Array<{ fields?: Record<string, unknown> }>;
+            }>;
+          };
+          const issueFields = meta.projects?.[0]?.issuetypes?.[0]?.fields;
+          if (issueFields && !(match.id in issueFields)) {
+            console.warn(
+              `Jira Story Points field ${match.id} not on ${storyType} create screen; skipping points.`
+            );
+            return null;
+          }
+        }
+        return match.id;
+      })();
+    }
+    return storyPointsFieldPromise;
+  }
 
   async function createIssue(fields: Record<string, unknown>): Promise<WorkItemRef> {
     const response = await jiraFetch(
@@ -167,6 +218,12 @@ export function createJiraAdapter(
       };
       if (descriptionParts.length) {
         fields.description = toAdf(descriptionParts.join('\n'));
+      }
+      if (details.storyPoints != null) {
+        const spField = await resolveStoryPointsField();
+        if (spField) {
+          fields[spField] = details.storyPoints;
+        }
       }
       return createIssue(fields);
     },

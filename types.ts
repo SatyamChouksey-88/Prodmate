@@ -10,6 +10,11 @@ export interface HistoryItem {
   data: Epic[];
 }
 
+/** Fibonacci effort values used for generation + export. */
+export type StoryPoints = 1 | 2 | 3 | 5 | 8 | 13;
+
+export const STORY_POINTS_OPTIONS: StoryPoints[] = [1, 2, 3, 5, 8, 13];
+
 export interface UserStory {
   id: string;
   story: string;
@@ -17,6 +22,8 @@ export interface UserStory {
   business_value: 'High' | 'Medium' | 'Low';
   risk_impact: 'High' | 'Medium' | 'Low';
   dependencies: string[];
+  /** Optional for older saved generations; new generates always set it. */
+  story_points?: StoryPoints;
 }
 
 export interface Feature {

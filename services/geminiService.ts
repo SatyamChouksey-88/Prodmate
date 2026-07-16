@@ -65,9 +65,13 @@ const responseSchema = {
                         type: Type.STRING
                     },
                     description: "A list of other story 'id's that this story depends on. Can be an empty array if there are no dependencies."
-                  }
+                  },
+                  story_points: {
+                    type: Type.NUMBER,
+                    description: "Fibonacci effort estimate. Must be one of: 1, 2, 3, 5, 8, or 13.",
+                  },
                 },
-                required: ['id', 'story', 'acceptance_criteria', 'business_value', 'risk_impact', 'dependencies'],
+                required: ['id', 'story', 'acceptance_criteria', 'business_value', 'risk_impact', 'dependencies', 'story_points'],
               },
             },
           },
@@ -121,6 +125,7 @@ export async function generateStories(
       4.  Tag the story with a 'business_value' ('High', 'Medium', or 'Low').
       5.  Tag the story with a 'risk_impact' ('High', 'Medium', or 'Low') based on complexity or potential issues.
       6.  Suggest 'dependencies' by listing the 'id's of any other user stories that must be completed first. If there are no dependencies, provide an empty array.
+      7.  Estimate 'story_points' using Fibonacci values only: 1, 2, 3, 5, 8, or 13.
       
       Use the knowledge base to provide clarifications and generate more accurate, context-aware stories. Your output must be a JSON array of objects that strictly follows the provided schema.
 

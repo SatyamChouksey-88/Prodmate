@@ -1,5 +1,6 @@
 import React, { useEffect, useId, useState } from 'react';
-import type { Epic, Feature, UserStory } from '../types';
+import type { Epic, Feature, UserStory, StoryPoints } from '../types';
+import { STORY_POINTS_OPTIONS } from '../types';
 import type { ExportedWorkItem } from '../services/apiClient';
 
 /**
@@ -151,9 +152,44 @@ const UserStoryCard: React.FC<{
         </button>
       </div>
 
-      <div className="flex flex-wrap gap-x-4 gap-y-2 mb-4 mt-3">
+      <div className="flex flex-wrap gap-x-4 gap-y-2 mb-4 mt-3 items-center">
         <Tag label="Business Value" value={story.business_value} />
         <Tag label="Risk/Impact" value={story.risk_impact} />
+        {editable ? (
+          <div className="flex items-center gap-2">
+            <label htmlFor={`${storyFieldId}-points`} className="text-sm font-medium text-foreground-muted">
+              Story points:
+            </label>
+            <select
+              id={`${storyFieldId}-points`}
+              value={story.story_points ?? ''}
+              onChange={(e) => {
+                const raw = e.target.value;
+                const story_points = raw
+                  ? (Number(raw) as StoryPoints)
+                  : undefined;
+                onChange({ ...story, story_points });
+              }}
+              className="text-sm bg-surface-muted border border-border rounded-md px-2 py-1 focus:ring-2 focus:ring-accent focus:outline-none"
+            >
+              <option value="">—</option>
+              {STORY_POINTS_OPTIONS.map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : (
+          story.story_points != null && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-foreground-muted">Story points:</span>
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-surface-muted text-foreground">
+                {story.story_points}
+              </span>
+            </div>
+          )
+        )}
       </div>
 
       <p className="font-semibold text-foreground mb-2">Acceptance Criteria:</p>

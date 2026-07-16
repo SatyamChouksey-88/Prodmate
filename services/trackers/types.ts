@@ -66,6 +66,7 @@ export interface StoryDetails {
   acceptanceCriteria?: string[];
   businessValue?: 'High' | 'Medium' | 'Low';
   riskImpact?: 'High' | 'Medium' | 'Low';
+  storyPoints?: 1 | 2 | 3 | 5 | 8 | 13;
 }
 
 export interface WorkItemTrackerAdapter {

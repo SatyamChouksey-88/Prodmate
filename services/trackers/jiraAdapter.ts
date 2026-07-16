@@ -65,6 +65,47 @@ export function createJiraAdapter(config: JiraConfig): WorkItemTrackerAdapter {
   const base = sanitizeBaseUrl(config.baseUrl);
   const storyType = config.storyIssueType?.trim() || 'Story';
   const auth = getAuthHeader(config.email, config.apiToken);
+  let storyPointsFieldPromise: Promise<string | null> | null = null;
+
+  async function resolveStoryPointsField(): Promise<string | null> {
+    if (!storyPointsFieldPromise) {
+      storyPointsFieldPromise = (async () => {
+        const fieldsRes = await jiraFetch(`${base}/rest/api/3/field`, {
+          method: 'GET',
+          headers: { Authorization: auth, Accept: 'application/json' },
+        });
+        if (!fieldsRes.ok) {
+          console.warn(`Jira field list failed (${fieldsRes.status}); skipping story points.`);
+          return null;
+        }
+        const fields = (await fieldsRes.json()) as Array<{ id: string; name?: string }>;
+        const match = fields.find((f) => {
+          const name = (f.name ?? '').toLowerCase();
+          return name === 'story points' || name === 'story point estimate';
+        });
+        if (!match) {
+          console.warn('Jira instance has no Story Points field; skipping points.');
+          return null;
+        }
+        const metaRes = await jiraFetch(
+          `${base}/rest/api/3/issue/createmeta?projectKeys=${encodeURIComponent(config.projectKey)}&issuetypeNames=${encodeURIComponent(storyType)}&expand=projects.issuetypes.fields`,
+          { method: 'GET', headers: { Authorization: auth, Accept: 'application/json' } }
+        );
+        if (metaRes.ok) {
+          const meta = await metaRes.json();
+          const issueFields = meta.projects?.[0]?.issuetypes?.[0]?.fields;
+          if (issueFields && !(match.id in issueFields)) {
+            console.warn(
+              `Jira Story Points field ${match.id} not on ${storyType} create screen; skipping points.`
+            );
+            return null;
+          }
+        }
+        return match.id;
+      })();
+    }
+    return storyPointsFieldPromise;
+  }
 
   async function createIssue(fields: Record<string, unknown>): Promise<WorkItemRef> {
     const response = await jiraFetch(`${base}/rest/api/3/issue`, {
@@ -205,6 +246,12 @@ export function createJiraAdapter(config: JiraConfig): WorkItemTrackerAdapter {
 
       if (descriptionParts.length) {
         fields.description = toAdf(descriptionParts.join('\n'));
+      }
+      if (details.storyPoints != null) {
+        const spField = await resolveStoryPointsField();
+        if (spField) {
+          fields[spField] = details.storyPoints;
+        }
       }
 
       return createIssue(fields);

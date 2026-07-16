@@ -13,6 +13,7 @@ export type EpicPayload = {
       business_value: 'High' | 'Medium' | 'Low';
       risk_impact: 'High' | 'Medium' | 'Low';
       dependencies: string[];
+      story_points?: 1 | 2 | 3 | 5 | 8 | 13;
     }>;
   }>;
 };
@@ -65,6 +66,7 @@ export async function exportBacklog(
             acceptanceCriteria: story.acceptance_criteria,
             businessValue: story.business_value,
             riskImpact: story.risk_impact,
+            storyPoints: story.story_points,
           },
           featureRef
         );

@@ -39,6 +39,7 @@ const sampleEpics: Epic[] = [
             business_value: 'High',
             risk_impact: 'Low',
             dependencies: [],
+            story_points: 3,
           },
           {
             id: 'US2',
@@ -47,6 +48,7 @@ const sampleEpics: Epic[] = [
             business_value: 'Medium',
             risk_impact: 'Medium',
             dependencies: ['US1'],
+            story_points: 5,
           },
         ],
       },
@@ -70,6 +72,11 @@ describe('WorkItemTrackerAdapter contract via exportBacklog', () => {
     expect(result.created.filter((c) => c.kind === 'story')).toHaveLength(2);
     expect(result.created.every((c) => c.ref.id && c.ref.url)).toBe(true);
     expect(progress.some((p) => /Export complete/i.test(p))).toBe(true);
+    expect(adapter.createUserStory).toHaveBeenCalledWith(
+      'As a user I can see the menu',
+      expect.objectContaining({ storyPoints: 3 }),
+      expect.anything()
+    );
   });
 
   it('skips parent links for virtual Jira features (D8c)', async () => {

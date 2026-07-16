@@ -27,6 +27,7 @@ const responseSchema = {
                   business_value: { type: Type.STRING },
                   risk_impact: { type: Type.STRING },
                   dependencies: { type: Type.ARRAY, items: { type: Type.STRING } },
+                  story_points: { type: Type.NUMBER },
                 },
                 required: [
                   'id',
@@ -35,6 +36,7 @@ const responseSchema = {
                   'business_value',
                   'risk_impact',
                   'dependencies',
+                  'story_points',
                 ],
               },
             },
@@ -60,6 +62,7 @@ export type GeneratedEpic = {
       business_value: 'High' | 'Medium' | 'Low';
       risk_impact: 'High' | 'Medium' | 'Low';
       dependencies: string[];
+      story_points: 1 | 2 | 3 | 5 | 8 | 13;
     }>;
   }>;
 };
@@ -74,7 +77,7 @@ export async function generateStoriesServer(
   const prompt = `
 You are an expert AI Shadow Product Owner.
 Break down the requirements into Epics → Features → User Stories as JSON matching the schema.
-User stories must use "As a … I want … so that …", include acceptance criteria, business_value and risk_impact (High|Medium|Low), and dependency ids.
+User stories must use "As a … I want … so that …", include acceptance criteria, business_value and risk_impact (High|Medium|Low), dependency ids, and story_points (Fibonacci: 1, 2, 3, 5, 8, or 13).
 
 Business Requirement:
 ---

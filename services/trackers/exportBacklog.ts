@@ -78,6 +78,7 @@ export async function exportBacklog(
             acceptanceCriteria: story.acceptance_criteria,
             businessValue: story.business_value,
             riskImpact: story.risk_impact,
+            storyPoints: story.story_points,
           },
           featureRef
         );

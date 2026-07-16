@@ -51,7 +51,8 @@ async function createWorkItem(
   config: AzureDevOpsConfig,
   type: 'Epic' | 'Feature' | 'User Story',
   title: string,
-  details: StoryDetails & { description?: string }
+  details: StoryDetails & { description?: string },
+  storyPointsField?: string | null
 ): Promise<WorkItemRef> {
   const apiUrl = `${getApiBaseUrl(config.orgUrl, config.project)}/workitems/$${type}?api-version=7.1-preview.3`;
 
@@ -88,6 +89,13 @@ async function createWorkItem(
       value: mapValueToPriority(details.businessValue),
     });
   }
+  if (details.storyPoints != null && storyPointsField) {
+    patchDocument.push({
+      op: 'add',
+      path: `/fields/${storyPointsField}`,
+      value: details.storyPoints,
+    });
+  }
 
   const response = await adoFetch(apiUrl, {
     method: 'POST',
@@ -113,8 +121,42 @@ async function createWorkItem(
   return { id: String(result.id), url: result.url };
 }
 
+const ADO_SP_PREFERRED = [
+  'Microsoft.VSTS.Scheduling.StoryPoints',
+  'Microsoft.VSTS.Scheduling.Effort',
+];
+
 export function createAzureDevOpsAdapter(config: AzureDevOpsConfig): WorkItemTrackerAdapter {
   assertInsecureClientIntegrationsAllowed('Azure DevOps');
+  let storyPointsFieldPromise: Promise<string | null> | null = null;
+
+  async function resolveStoryPointsField(): Promise<string | null> {
+    if (!storyPointsFieldPromise) {
+      storyPointsFieldPromise = (async () => {
+        const apiUrl = `${getApiBaseUrl(config.orgUrl, config.project)}/workitemtypes/${encodeURIComponent('User Story')}/fields?api-version=7.1`;
+        const response = await adoFetch(apiUrl, {
+          method: 'GET',
+          headers: { Authorization: getAuthHeader(config.pat) },
+        });
+        if (!response.ok) {
+          console.warn(`ADO story-points field probe failed (${response.status}); skipping points.`);
+          return null;
+        }
+        const fields = await response.json();
+        const names = new Set(
+          ((fields.value ?? []) as Array<{ referenceName?: string }>)
+            .map((f) => f.referenceName)
+            .filter(Boolean)
+        );
+        for (const candidate of ADO_SP_PREFERRED) {
+          if (names.has(candidate)) return candidate;
+        }
+        console.warn('ADO project has no StoryPoints/Effort field on User Story; skipping points.');
+        return null;
+      })();
+    }
+    return storyPointsFieldPromise;
+  }
 
   return {
     provider: 'azure-devops',
@@ -149,15 +191,16 @@ export function createAzureDevOpsAdapter(config: AzureDevOpsConfig): WorkItemTra
     },
 
     createEpic(title, description) {
-      return createWorkItem(config, 'Epic', title, { description });
+      return createWorkItem(config, 'Epic', title, { description }, null);
     },
 
     createFeature(title, description, _parentEpic) {
-      return createWorkItem(config, 'Feature', title, { description });
+      return createWorkItem(config, 'Feature', title, { description }, null);
     },
 
-    createUserStory(title, details, _parent) {
-      return createWorkItem(config, 'User Story', title, details);
+    async createUserStory(title, details, _parent) {
+      const spField = details.storyPoints != null ? await resolveStoryPointsField() : null;
+      return createWorkItem(config, 'User Story', title, details, spField);
     },
 
     async linkParent(child, parent) {
