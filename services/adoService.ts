@@ -30,7 +30,8 @@ export async function testADOConnection(config: TrackerADOConfig): Promise<strin
 export async function exportToADO(
   config: TrackerADOConfig,
   epics: Epic[],
-  onProgress: (message: string) => void
+  onProgress: (message: string) => void,
+  signal?: AbortSignal
 ): Promise<ExportResult> {
-  return exportToTracker(toAzureConfig(config), epics, onProgress);
+  return exportToTracker(toAzureConfig(config), epics, onProgress, signal);
 }

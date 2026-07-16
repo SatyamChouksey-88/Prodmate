@@ -110,7 +110,7 @@ _Source of truth for multi-phase work. Update status as phases complete._
 - [x] Keep results + history if export fails; allow retry-export
 - [x] Wire or remove `ADOExportModal.tsx` — **removed** (2026-07-16): ADO-only PAT form duplicated Settings and broke API-mode secret model; review UI lives on ResultsDisplay instead. `adoService.ts` kept as ADO surface.
 - [x] History delete/clear
-- [x] Cancel for long-running generate/export (AbortController; API fetch abort; demo Gemini cancel is best-effort)
+- [x] Cancel for long-running generate/export — AbortController + late-resolve guards; demo generate uses Gemini `abortSignal`; demo export loop checks signal and returns partial `created[]` via `ExportAbortedError`; **cancel never rolls back tracker items already created** (demo or API). API-mode cancel aborts the client fetch only — server export may continue; UI discloses this.
 - [x] Make `User.role` functional or remove it — kept as **profile label** (login + Header display + DB); not RBAC
 - [x] Verify: frontend `npm run build` + backend `tsc --noEmit` green (manual UI walkthrough recommended; live tracker export still Phase 2 [~])
 
@@ -209,7 +209,7 @@ _Source of truth for multi-phase work. Update status as phases complete._
 2. **What changed:** Split generate vs export in `App.tsx`; editable ResultsDisplay + Export bar; retry on export error; Cancel via AbortController; `DELETE /api/history` (+ `:id`); `/api/export` returns `created[]` with id/url/key; deleted `ADOExportModal.tsx` (explicit); kept `adoService.ts`.
 3. **How verified:** Frontend `npm run build` OK; backend `tsc --noEmit` OK. Phase 2 live ADO/Jira still **[~] not live-verified** (no test credentials).
 4. **Research applied:** Fetch `AbortSignal` for cancel; structured export refs for future live evidence.
-5. **Overrideable / trade-offs:** Role remains a profile label, not RBAC. Demo-mode Gemini cancel cannot abort in-flight model calls without SDK abort wiring. Phase 2 live export gap flagged, not closed.
+5. **Overrideable / trade-offs:** Role remains a profile label, not RBAC. Cancel does **not** roll back work items already written to ADO/Jira (demo mid-loop abort returns a partial `created[]` list; API cancel only aborts the browser fetch — the server loop may keep creating). Late-resolving cancelled promises are ignored via controller identity guards. Phase 2 live export gap flagged, not closed.
 6. **What's next:** Phase 6 housekeeping — wait for review.
 
 ### Phase 6 — 2026-07-16

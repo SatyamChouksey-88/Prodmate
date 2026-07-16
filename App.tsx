@@ -4,7 +4,9 @@ import {
   exportToTracker,
   isTrackerConfigured,
   normalizeTrackerConfig,
+  ExportAbortedError,
   type TrackerConfig,
+  type CreatedWorkItem,
 } from './services/trackers';
 import type { Epic, User, HistoryItem } from './types';
 import {
@@ -64,6 +66,19 @@ function isAbortError(err: unknown): boolean {
   );
 }
 
+const EXPORT_CANCEL_DISCLOSURE =
+  'Export cancelled. Work items already created in the tracker are not rolled back.';
+
+function mapCreatedItems(created: CreatedWorkItem[]): ExportedWorkItem[] {
+  return created.map((item) => ({
+    kind: item.kind,
+    title: item.title,
+    id: item.ref.id,
+    url: item.ref.url,
+    key: item.ref.key,
+  }));
+}
+
 const App: React.FC = () => {
   const apiMode = isApiMode();
   const [currentUser, setCurrentUser] = useState<(User | ApiUser) | null>(null);
@@ -76,6 +91,7 @@ const App: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [progressMessage, setProgressMessage] = useState('');
   const [exportedItems, setExportedItems] = useState<ExportedWorkItem[] | null>(null);
+  const [exportPartial, setExportPartial] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
   const clientIntegrationsEnabled = !apiMode && isInsecureClientIntegrationsEnabled();
@@ -177,6 +193,7 @@ const App: React.FC = () => {
     setResults(item.data);
     setGenerationId(apiMode ? item.id : undefined);
     setExportedItems(null);
+    setExportPartial(false);
     setStatus('ready');
     setError(null);
   };
@@ -206,12 +223,15 @@ const App: React.FC = () => {
   );
 
   const handleCancel = () => {
+    const wasExporting = status === 'exporting';
     abortRef.current?.abort();
     abortRef.current = null;
-    setProgressMessage('Cancelled.');
-    if (results) {
+    if (wasExporting) {
+      setProgressMessage(EXPORT_CANCEL_DISCLOSURE);
+      setExportPartial(true);
       setStatus('ready');
     } else {
+      setProgressMessage('Cancelled.');
       setStatus('idle');
     }
   };
@@ -243,6 +263,7 @@ const App: React.FC = () => {
       setResults(null);
       setGenerationId(undefined);
       setExportedItems(null);
+      setExportPartial(false);
 
       try {
         let generatedEpics: Epic[];
@@ -250,20 +271,24 @@ const App: React.FC = () => {
 
         if (apiMode) {
           const result = await apiGenerate(inputText, knowledgeBase, controller.signal);
+          if (abortRef.current !== controller) return;
           generatedEpics = result.epics;
           nextGenerationId = result.generationId;
           setHistory(await loadApiHistory());
         } else {
-          generatedEpics = await generateStories(inputText, knowledgeBase);
+          generatedEpics = await generateStories(inputText, knowledgeBase, controller.signal);
+          if (abortRef.current !== controller) return;
           nextGenerationId = persistDemoHistory(generatedEpics);
         }
 
+        if (abortRef.current !== controller) return;
         setResults(generatedEpics);
         setGenerationId(nextGenerationId);
         setStatus('ready');
         setProgressMessage('Review the plan, then export when ready.');
       } catch (err: unknown) {
-        if (isAbortError(err)) {
+        if (abortRef.current !== controller && !isAbortError(err)) return;
+        if (isAbortError(err) || abortRef.current !== controller) {
           setStatus('idle');
           setProgressMessage('Cancelled.');
           return;
@@ -307,34 +332,48 @@ const App: React.FC = () => {
     setProgressMessage('Exporting to work tracker...');
     setError(null);
     setExportedItems(null);
+    setExportPartial(false);
 
     try {
       if (apiMode) {
         const result = await apiExport(results, generationId, controller.signal);
+        if (abortRef.current !== controller) return;
         setExportedItems(result.created);
         setHistory(await loadApiHistory());
       } else {
-        const result = await exportToTracker(trackerConfig!, results, (progress) => {
-          setProgressMessage(progress);
-        });
-        setExportedItems(
-          result.created.map((item) => ({
-            kind: item.kind,
-            title: item.title,
-            id: item.ref.id,
-            url: item.ref.url,
-            key: item.ref.key,
-          }))
+        const result = await exportToTracker(
+          trackerConfig!,
+          results,
+          (progress) => {
+            setProgressMessage(progress);
+          },
+          controller.signal
         );
+        if (abortRef.current !== controller) return;
+        setExportedItems(mapCreatedItems(result.created));
         persistDemoHistory(results, generationId);
       }
 
+      if (abortRef.current !== controller) return;
+      setExportPartial(false);
       setStatus('success');
       setProgressMessage('Export complete!');
     } catch (err: unknown) {
-      if (isAbortError(err)) {
+      if (err instanceof ExportAbortedError) {
+        setExportedItems(mapCreatedItems(err.created));
+        setExportPartial(err.created.length > 0);
         setStatus('ready');
-        setProgressMessage('Export cancelled. Your plan is still here.');
+        setProgressMessage(
+          err.created.length > 0
+            ? `${EXPORT_CANCEL_DISCLOSURE} ${err.created.length} item(s) were already created (listed below).`
+            : EXPORT_CANCEL_DISCLOSURE
+        );
+        return;
+      }
+      if (isAbortError(err) || abortRef.current !== controller) {
+        setExportPartial(true);
+        setStatus('ready');
+        setProgressMessage(EXPORT_CANCEL_DISCLOSURE);
         return;
       }
       console.error(err);
@@ -451,6 +490,11 @@ const App: React.FC = () => {
             <div className="mt-12">
               {status === 'generating' && <Loader message={progressMessage} />}
               {status === 'exporting' && <Loader message={progressMessage} />}
+              {status === 'ready' && progressMessage.includes('cancelled') && (
+                <div className="mb-6 bg-warning-bg border border-border text-warning p-4 rounded-lg text-sm" role="status">
+                  {progressMessage}
+                </div>
+              )}
               {status === 'error' && error && (
                 <div className="mb-6 space-y-3">
                   <ErrorMessage message={error} />
@@ -476,6 +520,7 @@ const App: React.FC = () => {
                   isExporting={status === 'exporting'}
                   exportDisabled={!trackerReady}
                   exportedItems={exportedItems}
+                  exportPartial={exportPartial}
                 />
               )}
               {!isLoading && status !== 'error' && !results && <WelcomeMessage />}

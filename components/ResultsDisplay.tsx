@@ -226,6 +226,8 @@ export interface ResultsDisplayProps {
   isExporting?: boolean;
   showExportActions?: boolean;
   exportedItems?: ExportedWorkItem[] | null;
+  /** True when listed items are from a cancelled / partial export */
+  exportPartial?: boolean;
 }
 
 const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
@@ -238,6 +240,7 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
   isExporting = false,
   showExportActions = false,
   exportedItems = null,
+  exportPartial = false,
 }) => {
   return (
     <div className="space-y-6 animate-fade-in">
@@ -246,38 +249,49 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
       </h2>
 
       {showExportActions && (
-        <div className="bg-surface border border-border rounded-xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div>
-            <p className="font-semibold text-foreground">Review before export</p>
-            <p className="text-sm text-foreground-secondary">
-              Edit titles and story text below, then export to your configured work tracker.
-            </p>
-          </div>
-          <div className="flex gap-2">
-            {isExporting && onCancel && (
+        <div className="bg-surface border border-border rounded-xl p-4 flex flex-col gap-3">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <p className="font-semibold text-foreground">Review before export</p>
+              <p className="text-sm text-foreground-secondary">
+                Edit titles and story text below, then export to your configured work tracker.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              {isExporting && onCancel && (
+                <button
+                  type="button"
+                  onClick={onCancel}
+                  className="px-4 py-2 rounded-lg border border-border text-foreground-secondary hover:bg-surface-muted"
+                >
+                  Cancel
+                </button>
+              )}
               <button
                 type="button"
-                onClick={onCancel}
-                className="px-4 py-2 rounded-lg border border-border text-foreground-secondary hover:bg-surface-muted"
+                onClick={onExport}
+                disabled={exportDisabled || isExporting}
+                className="px-5 py-2.5 rounded-lg bg-gradient-to-r from-brand-primary to-brand-secondary text-accent-foreground font-semibold disabled:opacity-50"
               >
-                Cancel
+                {isExporting ? 'Exporting…' : 'Export to tracker'}
               </button>
-            )}
-            <button
-              type="button"
-              onClick={onExport}
-              disabled={exportDisabled || isExporting}
-              className="px-5 py-2.5 rounded-lg bg-gradient-to-r from-brand-primary to-brand-secondary text-accent-foreground font-semibold disabled:opacity-50"
-            >
-              {isExporting ? 'Exporting…' : 'Export to tracker'}
-            </button>
+            </div>
           </div>
+          {isExporting && (
+            <p className="text-xs text-warning" role="note">
+              Cancelling stops further client-side work, but does not roll back work items already
+              created in the tracker (including any the server may still finish creating after an
+              API-mode cancel).
+            </p>
+          )}
         </div>
       )}
 
       {exportedItems && exportedItems.length > 0 && (
         <div className="bg-success-bg border border-border rounded-xl p-4">
-          <p className="font-semibold text-success mb-2">Created work items</p>
+          <p className="font-semibold text-success mb-2">
+            {exportPartial ? 'Work items created before cancel' : 'Created work items'}
+          </p>
           <ul className="space-y-1 text-sm">
             {exportedItems.map((item) => (
               <li key={`${item.kind}-${item.id}`}>

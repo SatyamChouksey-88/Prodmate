@@ -93,4 +93,27 @@ describe('WorkItemTrackerAdapter contract via exportBacklog', () => {
     expect(adapter.linkParent).not.toHaveBeenCalled();
     expect(adapter.createUserStory).toHaveBeenCalledTimes(2);
   });
+
+  it('aborts mid-loop and reports partial created items', async () => {
+    const { ExportAbortedError } = await import('./exportBacklog');
+    const controller = new AbortController();
+    const adapter = makeAdapter({
+      createEpic: vi.fn(async () => {
+        const ref = { id: '1', url: 'https://example.test/1', key: 'E-1' };
+        controller.abort();
+        return ref;
+      }),
+    });
+
+    try {
+      await exportBacklog(adapter, sampleEpics, () => undefined, controller.signal);
+      expect.unreachable('expected ExportAbortedError');
+    } catch (err) {
+      expect(err).toBeInstanceOf(ExportAbortedError);
+      const aborted = err as InstanceType<typeof ExportAbortedError>;
+      expect(aborted.created).toHaveLength(1);
+      expect(aborted.created[0].kind).toBe('epic');
+      expect(adapter.createUserStory).not.toHaveBeenCalled();
+    }
+  });
 });

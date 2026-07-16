@@ -19,7 +19,7 @@ export {
   normalizeTrackerConfig,
 } from './types';
 
-export { exportBacklog } from './exportBacklog';
+export { exportBacklog, ExportAbortedError } from './exportBacklog';
 export type { CreatedWorkItem, ExportResult } from './exportBacklog';
 
 export function createTrackerAdapter(config: TrackerConfig): WorkItemTrackerAdapter {
@@ -36,8 +36,9 @@ export async function testTrackerConnection(config: TrackerConfig): Promise<stri
 export async function exportToTracker(
   config: TrackerConfig,
   epics: Parameters<typeof exportBacklog>[1],
-  onProgress: (message: string) => void
+  onProgress: (message: string) => void,
+  signal?: AbortSignal
 ): Promise<import('./exportBacklog').ExportResult> {
   const adapter = createTrackerAdapter(config);
-  return exportBacklog(adapter, epics, onProgress);
+  return exportBacklog(adapter, epics, onProgress, signal);
 }

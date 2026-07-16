@@ -93,7 +93,11 @@ function getGeminiClient(): GoogleGenAI {
   return new GoogleGenAI({ apiKey });
 }
 
-export async function generateStories(userInput: string, knowledgeBase: string): Promise<Epic[]> {
+export async function generateStories(
+  userInput: string,
+  knowledgeBase: string,
+  signal?: AbortSignal
+): Promise<Epic[]> {
     if (!isInsecureClientIntegrationsEnabled()) {
       assertInsecureClientIntegrationsAllowed('Story generation');
     }
@@ -139,6 +143,7 @@ export async function generateStories(userInput: string, knowledgeBase: string):
                 responseMimeType: "application/json",
                 responseSchema: responseSchema,
                 temperature: 0.4,
+                abortSignal: signal,
             },
         });
         
@@ -148,6 +153,10 @@ export async function generateStories(userInput: string, knowledgeBase: string):
         return parsedResponse as Epic[];
 
     } catch (error) {
+        if (signal?.aborted || (error instanceof Error && error.name === 'AbortError')) {
+          const abortErr = new DOMException('Generation cancelled', 'AbortError');
+          throw abortErr;
+        }
         if (error instanceof Error && error.message.includes('blocked')) {
           throw error;
         }
