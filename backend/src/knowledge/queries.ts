@@ -1,4 +1,4 @@
-import { query } from '../db/pool.js';
+import { query, pool } from '../db/pool.js';
 import { toPgVectorLiteral } from '../services/embeddingMath.js';
 
 export type KnowledgeDocumentRow = {
@@ -28,30 +28,56 @@ export async function listDocumentsForUser(userId: string) {
   );
 }
 
+/**
+ * Insert document + chunks atomically. Failure rolls back to zero rows.
+ * Chunks use a multi-row INSERT to cut round-trips.
+ */
 export async function insertDocumentWithChunks(
   userId: string,
   title: string,
   sourceFilename: string | null,
   chunks: Array<{ content: string; embedding: number[] }>
 ): Promise<{ documentId: string; chunkCount: number }> {
-  const doc = await query<{ id: string }>(
-    `INSERT INTO knowledge_documents (user_id, title, source_filename)
-     VALUES ($1, $2, $3)
-     RETURNING id`,
-    [userId, title, sourceFilename]
-  );
-  const documentId = doc.rows[0].id;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
 
-  for (let i = 0; i < chunks.length; i++) {
-    const chunk = chunks[i];
-    await query(
-      `INSERT INTO knowledge_chunks (document_id, user_id, chunk_index, content, embedding)
-       VALUES ($1, $2, $3, $4, $5::vector)`,
-      [documentId, userId, i, chunk.content, toPgVectorLiteral(chunk.embedding)]
+    const doc = await client.query<{ id: string }>(
+      `INSERT INTO knowledge_documents (user_id, title, source_filename)
+       VALUES ($1, $2, $3)
+       RETURNING id`,
+      [userId, title, sourceFilename]
     );
-  }
+    const documentId = doc.rows[0].id;
 
-  return { documentId, chunkCount: chunks.length };
+    if (chunks.length > 0) {
+      const params: unknown[] = [];
+      const valueRows: string[] = [];
+      let p = 1;
+      for (let i = 0; i < chunks.length; i++) {
+        const chunk = chunks[i]!;
+        valueRows.push(`($${p++}, $${p++}, $${p++}, $${p++}, $${p++}::vector)`);
+        params.push(documentId, userId, i, chunk.content, toPgVectorLiteral(chunk.embedding));
+      }
+      await client.query(
+        `INSERT INTO knowledge_chunks (document_id, user_id, chunk_index, content, embedding)
+         VALUES ${valueRows.join(', ')}`,
+        params
+      );
+    }
+
+    await client.query('COMMIT');
+    return { documentId, chunkCount: chunks.length };
+  } catch (err) {
+    try {
+      await client.query('ROLLBACK');
+    } catch {
+      /* ignore rollback errors */
+    }
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 /** Delete a document only if it belongs to the user (D9). */

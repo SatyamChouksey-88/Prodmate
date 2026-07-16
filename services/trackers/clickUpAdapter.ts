@@ -1,4 +1,5 @@
 import { assertInsecureClientIntegrationsAllowed } from '../../config/runtimeFlags';
+import { escapeMarkdown } from '../../shared/markdownEscape';
 import type {
   ClickUpConfig,
   StoryDetails,
@@ -66,13 +67,14 @@ function valueRiskTags(details: StoryDetails): string[] {
   return tags;
 }
 
+/** Escape AI/user prose; keep intentional structure markers we add. */
 function storyMarkdown(details: StoryDetails): string | undefined {
   const parts: string[] = [];
-  if (details.description?.trim()) parts.push(details.description.trim());
+  if (details.description?.trim()) parts.push(escapeMarkdown(details.description.trim()));
   if (details.acceptanceCriteria?.length) {
     parts.push('## Acceptance Criteria');
     for (const ac of details.acceptanceCriteria) {
-      parts.push(`- ${ac}`);
+      parts.push(`- ${escapeMarkdown(ac)}`);
     }
   }
   if (details.storyPoints != null) {
@@ -190,7 +192,7 @@ export function createClickUpAdapter(
 
     async createEpic(title, description) {
       const body: Record<string, unknown> = { name: title };
-      if (description?.trim()) body.markdown_content = description.trim();
+      if (description?.trim()) body.markdown_content = escapeMarkdown(description.trim());
 
       const response = await clickUpFetch(
         `${API_BASE}/space/${encodeURIComponent(spaceId)}/list`,
@@ -218,7 +220,7 @@ export function createClickUpAdapter(
     async createFeature(title, description, parentEpic) {
       const listId = parentEpic.id;
       const body: Record<string, unknown> = { name: title };
-      if (description?.trim()) body.markdown_description = description.trim();
+      if (description?.trim()) body.markdown_description = escapeMarkdown(description.trim());
       return createTaskInList(listId, body);
     },
 

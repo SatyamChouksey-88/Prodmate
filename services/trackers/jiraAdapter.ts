@@ -1,4 +1,5 @@
 import { assertInsecureClientIntegrationsAllowed } from '../../config/runtimeFlags';
+import { escapeMarkdown } from '../../shared/markdownEscape';
 import type {
   JiraConfig,
   StoryDetails,
@@ -8,7 +9,8 @@ import type {
 
 /** Atlassian Document Format paragraph helper (Jira Cloud REST API v3). */
 function toAdf(text: string) {
-  const paragraphs = text.split(/\n+/).filter(Boolean);
+  const safe = escapeMarkdown(text);
+  const paragraphs = safe.split(/\n+/).filter(Boolean);
   return {
     type: 'doc',
     version: 1,

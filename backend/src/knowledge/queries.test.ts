@@ -30,6 +30,17 @@ describe('knowledge query shape (always)', () => {
     );
     expect(queriesSrc).toMatch(/FROM knowledge_chunks WHERE user_id = \$1/);
   });
+
+  it('insertDocumentWithChunks uses a client transaction and multi-row chunk insert', () => {
+    expect(queriesSrc).toMatch(/pool\.connect\(\)/);
+    expect(queriesSrc).toMatch(/BEGIN/);
+    expect(queriesSrc).toMatch(/COMMIT/);
+    expect(queriesSrc).toMatch(/ROLLBACK/);
+    expect(queriesSrc).toMatch(/client\.release\(\)/);
+    expect(queriesSrc).toMatch(
+      /INSERT INTO knowledge_chunks[\s\S]*VALUES \$\{valueRows\.join/
+    );
+  });
 });
 
 describe('chunking', () => {
