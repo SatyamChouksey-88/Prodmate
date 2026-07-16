@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cosineSimilarity, l2Normalize } from './embeddingMath';
+import { cosineSimilarity, l2Normalize } from './embeddingMath.js';
 
 describe('cosineSimilarity', () => {
   it('returns 1 for identical L2-normalized vectors', () => {

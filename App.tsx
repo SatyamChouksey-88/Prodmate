@@ -25,6 +25,7 @@ import {
   apiDeleteHistoryItem,
   apiClearHistory,
   apiBacklogMatches,
+  apiRefineStory,
   type ApiUser,
   type ExportedWorkItem,
   type BacklogMatch,
@@ -101,6 +102,7 @@ const App: React.FC = () => {
   const [backlogMatches, setBacklogMatches] = useState<BacklogMatch[] | null>(null);
   const [backlogScanned, setBacklogScanned] = useState<number | null>(null);
   const [checkingBacklog, setCheckingBacklog] = useState(false);
+  const [refiningStoryId, setRefiningStoryId] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   const clientIntegrationsEnabled = !apiMode && isInsecureClientIntegrationsEnabled();
@@ -423,6 +425,30 @@ const App: React.FC = () => {
     persistDemoHistory,
   ]);
 
+  const handleRefineStory = useCallback(
+    async (epicIndex: number, featureIndex: number, storyId: string, instruction: string) => {
+      if (!results || !apiMode) return;
+      setRefiningStoryId(storyId);
+      setError(null);
+      try {
+        const data = await apiRefineStory({
+          instruction,
+          epicIndex,
+          featureIndex,
+          storyId,
+          epics: results,
+          generationId,
+        });
+        setResults(data.epics);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Refine failed');
+      } finally {
+        setRefiningStoryId(null);
+      }
+    },
+    [results, apiMode, generationId]
+  );
+
   const handleCheckBacklog = useCallback(async () => {
     if (!results || !apiMode) return;
     setCheckingBacklog(true);
@@ -575,6 +601,8 @@ const App: React.FC = () => {
                   isCheckingBacklog={checkingBacklog}
                   backlogMatches={backlogMatches}
                   backlogScanned={backlogScanned}
+                  onRefineStory={apiMode ? handleRefineStory : undefined}
+                  refiningStoryId={refiningStoryId}
                 />
               )}
               {!isLoading && status !== 'error' && !results && <WelcomeMessage />}

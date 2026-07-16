@@ -108,8 +108,12 @@ const UserStoryCard: React.FC<{
   story: UserStory;
   editable: boolean;
   onChange: (story: UserStory) => void;
-}> = ({ story, editable, onChange }) => {
+  onRefine?: (storyId: string, instruction: string) => Promise<void>;
+  refining?: boolean;
+}> = ({ story, editable, onChange, onRefine, refining }) => {
   const storyFieldId = useId();
+  const [showRefine, setShowRefine] = useState(false);
+  const [instruction, setInstruction] = useState('');
   const handleCopy = () => {
     let textToCopy = `User Story (${story.id}): ${story.story}\n`;
     textToCopy += `Business Value: ${story.business_value}, Risk/Impact: ${story.risk_impact}\n\n`;
@@ -210,6 +214,60 @@ const UserStoryCard: React.FC<{
           </div>
         </div>
       )}
+
+      {editable && onRefine && (
+        <div className="mt-4 pt-3 border-t border-border">
+          {!showRefine ? (
+            <button
+              type="button"
+              onClick={() => setShowRefine(true)}
+              className="text-sm text-accent hover:underline"
+            >
+              Refine story…
+            </button>
+          ) : (
+            <div className="space-y-2">
+              <label htmlFor={`${storyFieldId}-refine`} className="block text-sm font-medium text-foreground-secondary">
+                Refinement instruction
+              </label>
+              <textarea
+                id={`${storyFieldId}-refine`}
+                value={instruction}
+                onChange={(e) => setInstruction(e.target.value)}
+                rows={2}
+                placeholder='e.g. "make acceptance criteria more detailed"'
+                disabled={refining}
+                className="w-full text-sm bg-surface-muted border border-border rounded-md px-2 py-1 focus:ring-2 focus:ring-accent focus:outline-none"
+              />
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  disabled={refining || !instruction.trim()}
+                  onClick={async () => {
+                    await onRefine(story.id, instruction.trim());
+                    setInstruction('');
+                    setShowRefine(false);
+                  }}
+                  className="text-sm px-3 py-1.5 rounded-lg bg-gradient-to-r from-brand-primary to-brand-secondary text-accent-foreground font-semibold disabled:opacity-50"
+                >
+                  {refining ? 'Refining…' : 'Apply refine'}
+                </button>
+                <button
+                  type="button"
+                  disabled={refining}
+                  onClick={() => {
+                    setShowRefine(false);
+                    setInstruction('');
+                  }}
+                  className="text-sm px-3 py-1.5 rounded-lg border border-border"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
@@ -218,7 +276,11 @@ const FeatureCard: React.FC<{
   feature: Feature;
   editable: boolean;
   onChange: (feature: Feature) => void;
-}> = ({ feature, editable, onChange }) => {
+  epicIndex: number;
+  featureIndex: number;
+  onRefineStory?: (epicIndex: number, featureIndex: number, storyId: string, instruction: string) => Promise<void>;
+  refiningStoryId?: string | null;
+}> = ({ feature, editable, onChange, epicIndex, featureIndex, onRefineStory, refiningStoryId }) => {
   const [isOpen, setIsOpen] = useState(true);
   const titleId = useId();
   const descId = useId();
@@ -268,6 +330,13 @@ const FeatureCard: React.FC<{
               key={story.id}
               story={story}
               editable={editable}
+              refining={refiningStoryId === story.id}
+              onRefine={
+                onRefineStory
+                  ? (storyId, instruction) =>
+                      onRefineStory(epicIndex, featureIndex, storyId, instruction)
+                  : undefined
+              }
               onChange={(next) => {
                 const user_stories = feature.user_stories.map((s, i) => (i === si ? next : s));
                 onChange({ ...feature, user_stories });
@@ -285,7 +354,9 @@ const EpicCard: React.FC<{
   index: number;
   editable: boolean;
   onChange: (epic: Epic) => void;
-}> = ({ epic, index, editable, onChange }) => {
+  onRefineStory?: (epicIndex: number, featureIndex: number, storyId: string, instruction: string) => Promise<void>;
+  refiningStoryId?: string | null;
+}> = ({ epic, index, editable, onChange, onRefineStory, refiningStoryId }) => {
   const [isOpen, setIsOpen] = useState(index === 0);
   const titleId = useId();
   const descId = useId();
@@ -335,6 +406,10 @@ const EpicCard: React.FC<{
               key={i}
               feature={feature}
               editable={editable}
+              epicIndex={index}
+              featureIndex={i}
+              onRefineStory={onRefineStory}
+              refiningStoryId={refiningStoryId}
               onChange={(next) => {
                 const features = epic.features.map((f, fi) => (fi === i ? next : f));
                 onChange({ ...epic, features });
@@ -363,6 +438,8 @@ export interface ResultsDisplayProps {
   isCheckingBacklog?: boolean;
   backlogMatches?: BacklogMatch[] | null;
   backlogScanned?: number | null;
+  onRefineStory?: (epicIndex: number, featureIndex: number, storyId: string, instruction: string) => Promise<void>;
+  refiningStoryId?: string | null;
 }
 
 const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
@@ -380,6 +457,8 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
   isCheckingBacklog = false,
   backlogMatches = null,
   backlogScanned = null,
+  onRefineStory,
+  refiningStoryId = null,
 }) => {
   return (
     <div className="space-y-6 animate-fade-in">
@@ -507,6 +586,8 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
           epic={epic}
           index={i}
           editable={editable}
+          onRefineStory={onRefineStory}
+          refiningStoryId={refiningStoryId}
           onChange={(next) => {
             if (!onResultsChange) return;
             onResultsChange(results.map((e, ei) => (ei === i ? next : e)));

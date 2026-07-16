@@ -107,3 +107,72 @@ ${knowledgeBase || 'No additional context provided.'}
   }
   return JSON.parse(jsonText) as GeneratedEpic[];
 }
+
+const storySchema = {
+  type: Type.OBJECT,
+  properties: {
+    id: { type: Type.STRING },
+    story: { type: Type.STRING },
+    acceptance_criteria: { type: Type.ARRAY, items: { type: Type.STRING } },
+    business_value: { type: Type.STRING },
+    risk_impact: { type: Type.STRING },
+    dependencies: { type: Type.ARRAY, items: { type: Type.STRING } },
+    story_points: { type: Type.NUMBER },
+  },
+  required: [
+    'id',
+    'story',
+    'acceptance_criteria',
+    'business_value',
+    'risk_impact',
+    'dependencies',
+    'story_points',
+  ],
+};
+
+export type GeneratedStory = GeneratedEpic['features'][number]['user_stories'][number];
+
+export async function refineStoryServer(
+  input: {
+    story: GeneratedStory;
+    instruction: string;
+    epicTitle: string;
+    featureTitle: string;
+  },
+  parentSignal?: AbortSignal
+): Promise<GeneratedStory> {
+  const ai = new GoogleGenAI({ apiKey: config.geminiApiKey });
+  const prompt = `
+You are an expert AI Shadow Product Owner.
+Refine ONLY the following user story per the instruction. Keep the same id.
+Do not invent sibling stories. Preserve dependency ids unless the instruction requires changing them.
+story_points must be one of 1, 2, 3, 5, 8, 13.
+
+Epic context: ${input.epicTitle}
+Feature context: ${input.featureTitle}
+
+Current story JSON:
+${JSON.stringify(input.story, null, 2)}
+
+Refinement instruction:
+${input.instruction}
+`;
+
+  const response = await ai.models.generateContent({
+    model: 'gemini-2.5-flash',
+    contents: prompt,
+    config: {
+      responseMimeType: 'application/json',
+      responseSchema: storySchema,
+      temperature: 0.4,
+      abortSignal: timeoutSignal(config.geminiTimeoutMs, parentSignal),
+    },
+  });
+
+  const jsonText = (response.text ?? '').trim();
+  if (!jsonText) throw new Error('Empty response from Gemini');
+  const refined = JSON.parse(jsonText) as GeneratedStory;
+  refined.id = input.story.id;
+  return refined;
+}
+

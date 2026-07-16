@@ -86,6 +86,20 @@ export async function apiGenerate(
   });
 }
 
+export async function apiRefineStory(input: {
+  instruction: string;
+  epicIndex: number;
+  featureIndex: number;
+  storyId: string;
+  epics: Epic[];
+  generationId?: string;
+}): Promise<{ ok: true; story: Epic['features'][number]['user_stories'][number]; epics: Epic[] }> {
+  return api('/api/generate/refine-story', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
 export type KnowledgeDocument = {
   id: string;
   title: string;
