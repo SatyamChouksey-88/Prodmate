@@ -212,6 +212,19 @@ export type BacklogMatch = {
   existing: { id: string; title: string; description?: string; url: string; key?: string };
 };
 
+export async function apiExportPreview(
+  epics: Epic[]
+): Promise<{
+  ok: true;
+  provider: string;
+  lines: Array<{ kind: 'epic' | 'feature' | 'story'; title: string; parentHint?: string; fields: string[] }>;
+}> {
+  return api('/api/export/preview', {
+    method: 'POST',
+    body: JSON.stringify({ epics }),
+  });
+}
+
 export async function apiBacklogMatches(
   epics: Epic[],
   signal?: AbortSignal

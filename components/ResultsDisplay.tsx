@@ -440,6 +440,11 @@ export interface ResultsDisplayProps {
   backlogScanned?: number | null;
   onRefineStory?: (epicIndex: number, featureIndex: number, storyId: string, instruction: string) => Promise<void>;
   refiningStoryId?: string | null;
+  exportPreview?: { provider: string; lines: Array<{ kind: string; title: string; parentHint?: string; fields: string[] }> } | null;
+  onRequestExport?: () => void;
+  onConfirmExport?: () => void;
+  onDismissPreview?: () => void;
+  isLoadingPreview?: boolean;
 }
 
 const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
@@ -459,6 +464,11 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
   backlogScanned = null,
   onRefineStory,
   refiningStoryId = null,
+  exportPreview = null,
+  onRequestExport,
+  onConfirmExport,
+  onDismissPreview,
+  isLoadingPreview = false,
 }) => {
   return (
     <div className="space-y-6 animate-fade-in">
@@ -497,11 +507,11 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
               )}
               <button
                 type="button"
-                onClick={onExport}
-                disabled={exportDisabled || isExporting}
+                onClick={onRequestExport ?? onExport}
+                disabled={exportDisabled || isExporting || isLoadingPreview}
                 className="px-5 py-2.5 rounded-lg bg-gradient-to-r from-brand-primary to-brand-secondary text-accent-foreground font-semibold disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-surface focus:ring-accent"
               >
-                {isExporting ? 'Exporting…' : 'Export to tracker'}
+                {isLoadingPreview ? 'Building preview…' : isExporting ? 'Exporting…' : 'Export to tracker'}
               </button>
             </div>
           </div>
@@ -512,6 +522,51 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
               back.
             </p>
           )}
+        </div>
+      )}
+
+      {exportPreview && (
+        <div className="bg-surface border border-border rounded-xl p-4 space-y-3" role="dialog" aria-label="Export preview">
+          <div>
+            <p className="font-semibold text-foreground">Export preview ({exportPreview.provider})</p>
+            <p className="text-sm text-foreground-secondary">
+              Mapped plan only — nothing has been created yet. Confirm to run the live export.
+            </p>
+          </div>
+          <ul className="max-h-64 overflow-y-auto space-y-2 text-sm">
+            {exportPreview.lines.map((line, i) => (
+              <li key={`${line.kind}-${i}`} className="border-t border-border pt-2">
+                <span className="uppercase text-xs font-semibold text-foreground-muted mr-2">{line.kind}</span>
+                <span className="font-medium text-foreground">{line.title}</span>
+                {line.parentHint && (
+                  <span className="text-foreground-muted text-xs ml-2">← {line.parentHint}</span>
+                )}
+                <ul className="mt-1 text-foreground-secondary list-disc list-inside">
+                  {line.fields.map((f) => (
+                    <li key={f}>{f}</li>
+                  ))}
+                </ul>
+              </li>
+            ))}
+          </ul>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={onConfirmExport}
+              disabled={isExporting}
+              className="px-5 py-2.5 rounded-lg bg-gradient-to-r from-brand-primary to-brand-secondary text-accent-foreground font-semibold disabled:opacity-50"
+            >
+              Confirm export
+            </button>
+            <button
+              type="button"
+              onClick={onDismissPreview}
+              disabled={isExporting}
+              className="px-4 py-2 rounded-lg border border-border"
+            >
+              Back
+            </button>
+          </div>
         </div>
       )}
 

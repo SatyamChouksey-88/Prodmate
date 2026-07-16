@@ -16,6 +16,7 @@ import {
   BACKLOG_LIST_LIMIT,
   findBacklogMatches,
 } from '../export/backlogSimilarity.js';
+import { describeExportPlan } from '../trackers/describeExportPlan.js';
 
 const exportSchema = z.object({
   epics: z.array(z.unknown()).min(1),
@@ -23,6 +24,10 @@ const exportSchema = z.object({
 });
 
 const matchSchema = z.object({
+  epics: z.array(z.unknown()).min(1),
+});
+
+const previewSchema = z.object({
   epics: z.array(z.unknown()).min(1),
 });
 
@@ -123,6 +128,36 @@ export async function exportRoutes(
       })();
 
       return reply.type('application/x-ndjson; charset=utf-8').send(stream);
+    }
+  );
+
+  app.post(
+    '/api/export/preview',
+    { preHandler: [requireAuth, opts.exportLimit] },
+    async (request, reply) => {
+      const parsed = previewSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.code(400).send({ error: parsed.error.flatten() });
+      }
+
+      const cfgResult = await query<{ config_ciphertext: string }>(
+        `SELECT config_ciphertext FROM tracker_configs WHERE user_id = $1`,
+        [request.user!.id]
+      );
+      if (!cfgResult.rows[0]) {
+        return reply.code(400).send({ error: 'Configure a work tracker before previewing export.' });
+      }
+
+      const trackerConfig = decryptJson<TrackerConfig>(cfgResult.rows[0].config_ciphertext);
+      const lines = describeExportPlan(
+        trackerConfig.provider,
+        parsed.data.epics as Parameters<typeof describeExportPlan>[1]
+      );
+      await writeAudit(request.user!.id, 'export.preview', {
+        provider: trackerConfig.provider,
+        lineCount: lines.length,
+      });
+      return { ok: true, provider: trackerConfig.provider, lines };
     }
   );
 

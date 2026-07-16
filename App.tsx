@@ -5,8 +5,10 @@ import {
   isTrackerConfigured,
   normalizeTrackerConfig,
   ExportAbortedError,
+  describeExportPlan,
   type TrackerConfig,
   type CreatedWorkItem,
+  type PreviewLine,
 } from './services/trackers';
 import type { Epic, User, HistoryItem } from './types';
 import {
@@ -26,6 +28,7 @@ import {
   apiClearHistory,
   apiBacklogMatches,
   apiRefineStory,
+  apiExportPreview,
   type ApiUser,
   type ExportedWorkItem,
   type BacklogMatch,
@@ -103,6 +106,11 @@ const App: React.FC = () => {
   const [backlogScanned, setBacklogScanned] = useState<number | null>(null);
   const [checkingBacklog, setCheckingBacklog] = useState(false);
   const [refiningStoryId, setRefiningStoryId] = useState<string | null>(null);
+  const [exportPreview, setExportPreview] = useState<{
+    provider: string;
+    lines: PreviewLine[];
+  } | null>(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
   const clientIntegrationsEnabled = !apiMode && isInsecureClientIntegrationsEnabled();
@@ -330,6 +338,27 @@ const App: React.FC = () => {
     [currentUser, clientIntegrationsEnabled, apiMode, persistDemoHistory]
   );
 
+  const handlePreviewExport = useCallback(async () => {
+    if (!results || !trackerConfig) return;
+    setLoadingPreview(true);
+    setError(null);
+    try {
+      if (apiMode) {
+        const data = await apiExportPreview(results);
+        setExportPreview({ provider: data.provider, lines: data.lines });
+      } else {
+        setExportPreview({
+          provider: trackerConfig.provider,
+          lines: describeExportPlan(trackerConfig.provider, results),
+        });
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Export preview failed');
+    } finally {
+      setLoadingPreview(false);
+    }
+  }, [results, trackerConfig, apiMode]);
+
   const handleExport = useCallback(async () => {
     if (!results || !currentUser) return;
 
@@ -353,6 +382,7 @@ const App: React.FC = () => {
     const controller = new AbortController();
     abortRef.current = controller;
 
+    setExportPreview(null);
     setStatus('exporting');
     setProgressMessage('Exporting to work tracker...');
     setError(null);
@@ -592,6 +622,11 @@ const App: React.FC = () => {
                   onResultsChange={setResults}
                   showExportActions={showReviewActions}
                   onExport={handleExport}
+                  onRequestExport={handlePreviewExport}
+                  onConfirmExport={handleExport}
+                  onDismissPreview={() => setExportPreview(null)}
+                  exportPreview={exportPreview}
+                  isLoadingPreview={loadingPreview}
                   onCancel={status === 'exporting' ? handleCancel : undefined}
                   isExporting={status === 'exporting'}
                   exportDisabled={!trackerReady}

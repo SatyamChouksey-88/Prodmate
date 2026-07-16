@@ -23,6 +23,8 @@ export {
 
 export { exportBacklog, ExportAbortedError } from './exportBacklog';
 export type { CreatedWorkItem, ExportResult } from './exportBacklog';
+export { describeExportPlan } from './describeExportPlan';
+export type { PreviewLine } from './describeExportPlan';
 
 export function createTrackerAdapter(
   config: TrackerConfig,
