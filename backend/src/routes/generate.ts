@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { requireAuth } from '../auth/session.js';
+import { writeAudit } from '../audit/log.js';
 import { generateStoriesServer } from '../services/gemini.js';
 import { query } from '../db/pool.js';
 
@@ -28,7 +29,12 @@ export async function generateRoutes(app: FastifyInstance) {
          RETURNING id`,
         [request.user!.id, title, JSON.stringify(epics)]
       );
-      return { generationId: insert.rows[0].id, epics };
+      const generationId = insert.rows[0].id;
+      await writeAudit(request.user!.id, 'generate', {
+        generationId,
+        epicCount: epics.length,
+      });
+      return { generationId, epics };
     } catch (err) {
       console.error(err);
       return reply.code(502).send({

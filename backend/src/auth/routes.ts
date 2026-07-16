@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { query } from '../db/pool.js';
+import { writeAudit } from '../audit/log.js';
 import { hashPassword, verifyPassword } from './password.js';
 import {
   clearSessionCookie,
@@ -44,6 +45,7 @@ export async function authRoutes(app: FastifyInstance) {
       const user = result.rows[0];
       const sessionId = await createSession(user.id);
       setSessionCookie(reply, sessionId);
+      await writeAudit(user.id, 'auth.register', { email: user.email });
       return { user };
     } catch (err: unknown) {
       const code = (err as { code?: string }).code;
@@ -70,11 +72,13 @@ export async function authRoutes(app: FastifyInstance) {
       email.toLowerCase(),
     ]);
     const row = result.rows[0];
+    // Note: short-circuit skips bcrypt when user missing — Phase 8 timing side-channel fix.
     if (!row || !(await verifyPassword(password, row.password_hash))) {
       return reply.code(401).send({ error: 'Invalid email or password' });
     }
     const sessionId = await createSession(row.id);
     setSessionCookie(reply, sessionId);
+    await writeAudit(row.id, 'auth.login', { email: row.email });
     return {
       user: { id: row.id, email: row.email, name: row.name, role: row.role },
     };

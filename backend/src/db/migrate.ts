@@ -7,9 +7,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 async function migrate() {
   await pool.query('CREATE EXTENSION IF NOT EXISTS pgcrypto');
-  const schema = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8');
-  await pool.query(schema);
-  console.log('Migration complete.');
+  const phase3 = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8');
+  await pool.query(phase3);
+  const phase4 = fs.readFileSync(path.join(__dirname, 'schema_phase4.sql'), 'utf8');
+  await pool.query(phase4);
+  console.log('Migration complete (phase 3 + phase 4).');
   await pool.end();
 }
 

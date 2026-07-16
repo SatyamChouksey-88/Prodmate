@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { requireAuth } from '../auth/session.js';
+import { writeAudit } from '../audit/log.js';
 import { decryptJson, encryptJson } from '../crypto/credentials.js';
 import { query } from '../db/pool.js';
 import { isTrackerConfigured, type TrackerConfig } from '../trackers/index.js';
@@ -35,7 +36,6 @@ export async function trackerSettingsRoutes(app: FastifyInstance) {
       return reply.code(400).send({ error: 'Incomplete tracker configuration' });
     }
 
-    // If client sent redacted secret, merge with existing ciphertext
     let toStore = body;
     if (
       (body.provider === 'azure-devops' && body.pat.includes('•')) ||
@@ -68,6 +68,7 @@ export async function trackerSettingsRoutes(app: FastifyInstance) {
              updated_at = now()`,
       [request.user!.id, toStore.provider, ciphertext]
     );
+    await writeAudit(request.user!.id, 'tracker.save', { provider: toStore.provider });
     return { config: redact(toStore) };
   });
 }

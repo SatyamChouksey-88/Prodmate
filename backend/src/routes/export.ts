@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { requireAuth } from '../auth/session.js';
+import { writeAudit } from '../audit/log.js';
 import { decryptJson } from '../crypto/credentials.js';
 import { query } from '../db/pool.js';
 import {
@@ -37,6 +38,11 @@ export async function exportRoutes(app: FastifyInstance) {
       await exportBacklog(adapter, parsed.data.epics as Parameters<typeof exportBacklog>[1], (msg) => {
         progress.push(msg);
       });
+      await writeAudit(request.user!.id, 'export', {
+        provider: trackerConfig.provider,
+        generationId: parsed.data.generationId,
+        epicCount: parsed.data.epics.length,
+      });
       return { ok: true, progress };
     } catch (err) {
       console.error(err);
@@ -54,6 +60,7 @@ export async function exportRoutes(app: FastifyInstance) {
     }
     try {
       const message = await createTrackerAdapter(body).testConnection();
+      await writeAudit(request.user!.id, 'tracker.test', { provider: body.provider });
       return { ok: true, message };
     } catch (err) {
       return reply.code(400).send({
