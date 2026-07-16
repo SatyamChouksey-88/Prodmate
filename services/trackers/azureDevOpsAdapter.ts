@@ -1,18 +1,11 @@
 import { assertInsecureClientIntegrationsAllowed } from '../../config/runtimeFlags';
+import { escapeHtml } from '../../shared/htmlEscape';
 import type {
   AzureDevOpsConfig,
   StoryDetails,
   WorkItemRef,
   WorkItemTrackerAdapter,
 } from './types';
-
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
 
 async function adoFetch(url: string, options: RequestInit): Promise<Response> {
   try {
