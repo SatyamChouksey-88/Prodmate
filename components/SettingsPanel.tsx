@@ -4,11 +4,13 @@ import {
   type TrackerConfig,
   type TrackerProvider,
 } from '../services/trackers';
+import { apiTestTracker } from '../services/apiClient';
 
 interface SettingsPanelProps {
   config: TrackerConfig | null;
-  onSave: (config: TrackerConfig) => void;
+  onSave: (config: TrackerConfig) => void | Promise<void>;
   integrationsEnabled: boolean;
+  useApi?: boolean;
 }
 
 const emptyAdo = (): TrackerConfig => ({
@@ -27,7 +29,12 @@ const emptyJira = (): TrackerConfig => ({
   storyIssueType: 'Story',
 });
 
-const SettingsPanel: React.FC<SettingsPanelProps> = ({ config, onSave, integrationsEnabled }) => {
+const SettingsPanel: React.FC<SettingsPanelProps> = ({
+  config,
+  onSave,
+  integrationsEnabled,
+  useApi = false,
+}) => {
   const [isOpen, setIsOpen] = useState(!config || !isConfigured(config));
   const [formState, setFormState] = useState<TrackerConfig>(config ?? emptyAdo());
   const [isSaved, setIsSaved] = useState(false);
@@ -47,10 +54,10 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ config, onSave, integrati
     setTestMessage('');
   };
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!integrationsEnabled) return;
-    onSave(formState);
+    await onSave(formState);
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 2000);
   };
@@ -60,7 +67,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ config, onSave, integrati
     setTestStatus('testing');
     setTestMessage('');
     try {
-      const successMessage = await testTrackerConnection(formState);
+      const successMessage = useApi
+        ? await apiTestTracker(formState)
+        : await testTrackerConnection(formState);
       setTestStatus('success');
       setTestMessage(successMessage);
     } catch (err: unknown) {
