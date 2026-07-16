@@ -13,3 +13,12 @@ export function l2Normalize(values: number[]): number[] {
 export function toPgVectorLiteral(values: number[]): string {
   return `[${values.join(',')}]`;
 }
+
+/** Cosine similarity for L2-normalized vectors (dot product). */
+export function cosineSimilarity(a: number[], b: number[]): number {
+  if (a.length !== b.length || a.length === 0) return 0;
+  let dot = 0;
+  for (let i = 0; i < a.length; i++) dot += a[i]! * b[i]!;
+  return dot;
+}
+

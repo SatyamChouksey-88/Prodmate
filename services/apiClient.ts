@@ -190,6 +190,25 @@ export async function apiExport(
   return { ok: true, progress, created };
 }
 
+export type BacklogMatch = {
+  storyId: string;
+  storyText: string;
+  kind: 'duplicate' | 'related';
+  score: number;
+  existing: { id: string; title: string; description?: string; url: string; key?: string };
+};
+
+export async function apiBacklogMatches(
+  epics: Epic[],
+  signal?: AbortSignal
+): Promise<{ ok: true; scanned: number; limit: number; matches: BacklogMatch[] }> {
+  return api('/api/export/backlog-matches', {
+    method: 'POST',
+    body: JSON.stringify({ epics }),
+    signal,
+  });
+}
+
 export async function apiGetTrackerSettings(): Promise<TrackerConfig | null> {
   const data = await api<{ config: TrackerConfig | null }>('/api/tracker/settings');
   return data.config;

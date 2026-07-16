@@ -1,7 +1,7 @@
 import React, { useEffect, useId, useState } from 'react';
 import type { Epic, Feature, UserStory, StoryPoints } from '../types';
 import { STORY_POINTS_OPTIONS } from '../types';
-import type { ExportedWorkItem } from '../services/apiClient';
+import type { ExportedWorkItem, BacklogMatch } from '../services/apiClient';
 
 /**
  * Band 4 — local draft state (commit on blur), not React.memo.
@@ -359,6 +359,10 @@ export interface ResultsDisplayProps {
   exportedItems?: ExportedWorkItem[] | null;
   /** True when listed items are from a cancelled / partial export */
   exportPartial?: boolean;
+  onCheckBacklog?: () => void;
+  isCheckingBacklog?: boolean;
+  backlogMatches?: BacklogMatch[] | null;
+  backlogScanned?: number | null;
 }
 
 const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
@@ -372,6 +376,10 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
   showExportActions = false,
   exportedItems = null,
   exportPartial = false,
+  onCheckBacklog,
+  isCheckingBacklog = false,
+  backlogMatches = null,
+  backlogScanned = null,
 }) => {
   return (
     <div className="space-y-6 animate-fade-in">
@@ -388,7 +396,17 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                 Edit titles and story text below, then export to your configured work tracker.
               </p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
+              {onCheckBacklog && (
+                <button
+                  type="button"
+                  onClick={onCheckBacklog}
+                  disabled={exportDisabled || isExporting || isCheckingBacklog}
+                  className="px-4 py-2 rounded-lg border border-border text-foreground-secondary hover:bg-surface-muted disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-surface focus:ring-accent"
+                >
+                  {isCheckingBacklog ? 'Checking backlog…' : 'Check backlog'}
+                </button>
+              )}
               {isExporting && onCancel && (
                 <button
                   type="button"
@@ -414,6 +432,47 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
               items (via request close). Work items already written to the tracker are not rolled
               back.
             </p>
+          )}
+        </div>
+      )}
+
+      {backlogMatches && (
+        <div className="bg-warning-bg border border-border rounded-xl p-4" role="status">
+          <p className="font-semibold text-warning mb-1">Possible backlog overlaps</p>
+          <p className="text-sm text-foreground-secondary mb-3">
+            Informational only — export is not blocked.
+            {backlogScanned != null ? ` Scanned ${backlogScanned} recent tracker items.` : ''}
+          </p>
+          {backlogMatches.length === 0 ? (
+            <p className="text-sm text-foreground-secondary">No close matches found in the recent slice.</p>
+          ) : (
+            <ul className="space-y-2 text-sm">
+              {backlogMatches.map((m) => (
+                <li key={`${m.storyId}-${m.existing.id}`} className="border-t border-border pt-2">
+                  <span className="uppercase text-xs font-semibold text-foreground-muted mr-2">
+                    {m.kind}
+                  </span>
+                  <span className="text-foreground-muted text-xs mr-2">
+                    score {m.score.toFixed(2)}
+                  </span>
+                  <span className="text-foreground-secondary">Generated {m.storyId} ≈ </span>
+                  {m.existing.url ? (
+                    <a
+                      href={m.existing.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-accent hover:underline"
+                    >
+                      {m.existing.key || m.existing.id}: {m.existing.title}
+                    </a>
+                  ) : (
+                    <span>
+                      {m.existing.key || m.existing.id}: {m.existing.title}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
           )}
         </div>
       )}

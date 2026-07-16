@@ -18,6 +18,7 @@ function makeAdapter(overrides: Partial<WorkItemTrackerAdapter> = {}): WorkItemT
     createUserStory: vi.fn(async (title) => nextRef(`story-${title}`)),
     linkParent: vi.fn(async () => undefined),
     linkDependency: vi.fn(async () => undefined),
+    listExistingItems: vi.fn(async () => []),
     ...overrides,
   };
   return adapter;

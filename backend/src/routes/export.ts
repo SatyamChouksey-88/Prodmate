@@ -12,10 +12,18 @@ import {
 } from '../trackers/index.js';
 import type { RateLimitPreHandler } from '../rateLimit.js';
 import { isAbortError } from '../http/timeout.js';
+import {
+  BACKLOG_LIST_LIMIT,
+  findBacklogMatches,
+} from '../export/backlogSimilarity.js';
 
 const exportSchema = z.object({
   epics: z.array(z.unknown()).min(1),
   generationId: z.string().uuid().optional(),
+});
+
+const matchSchema = z.object({
+  epics: z.array(z.unknown()).min(1),
 });
 
 type NdjsonEvent =
@@ -115,6 +123,66 @@ export async function exportRoutes(
       })();
 
       return reply.type('application/x-ndjson; charset=utf-8').send(stream);
+    }
+  );
+
+  app.post(
+    '/api/export/backlog-matches',
+    { preHandler: [requireAuth, opts.exportLimit] },
+    async (request, reply) => {
+      const parsed = matchSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.code(400).send({ error: parsed.error.flatten() });
+      }
+
+      const epics = parsed.data.epics as Array<{
+        features: Array<{
+          user_stories: Array<{ id: string; story: string }>;
+        }>;
+      }>;
+      const stories = epics.flatMap((e) =>
+        e.features.flatMap((f) =>
+          f.user_stories.map((s) => ({ id: s.id, story: s.story }))
+        )
+      );
+
+      const cfgResult = await query<{ config_ciphertext: string }>(
+        `SELECT config_ciphertext FROM tracker_configs WHERE user_id = $1`,
+        [request.user!.id]
+      );
+      if (!cfgResult.rows[0]) {
+        return reply.code(400).send({ error: 'Configure a work tracker before checking the backlog.' });
+      }
+
+      const trackerConfig = decryptJson<TrackerConfig>(cfgResult.rows[0].config_ciphertext);
+      const abort = new AbortController();
+      const onClose = () => abort.abort();
+      request.raw.on('close', onClose);
+
+      try {
+        const adapter = createTrackerAdapter(trackerConfig, { signal: abort.signal });
+        const existing = await adapter.listExistingItems({ limit: BACKLOG_LIST_LIMIT });
+        const matches = await findBacklogMatches(stories, existing, abort.signal);
+        return {
+          ok: true,
+          scanned: existing.length,
+          limit: BACKLOG_LIST_LIMIT,
+          matches: matches.map((m) => ({
+            storyId: m.storyId,
+            storyText: m.storyText,
+            kind: m.kind,
+            score: Math.round(m.score * 1000) / 1000,
+            existing: m.existing,
+          })),
+        };
+      } catch (err) {
+        console.error(err);
+        return reply.code(502).send({
+          error: err instanceof Error ? err.message : 'Backlog match failed',
+        });
+      } finally {
+        request.raw.off('close', onClose);
+      }
     }
   );
 

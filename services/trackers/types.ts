@@ -61,6 +61,21 @@ export interface WorkItemRef {
   };
 }
 
+export interface ExistingWorkItem {
+  id: string;
+  title: string;
+  description?: string;
+  url: string;
+  key?: string;
+}
+
+export interface ListExistingItemsOptions {
+  /** Max items to return (adapters default to 100). */
+  limit?: number;
+  /** Reserved for future text search; unused in v1. */
+  query?: string;
+}
+
 export interface StoryDetails {
   description?: string;
   acceptanceCriteria?: string[];
@@ -89,6 +104,8 @@ export interface WorkItemTrackerAdapter {
   ): Promise<WorkItemRef>;
   linkParent(child: WorkItemRef, parent: WorkItemRef): Promise<void>;
   linkDependency(from: WorkItemRef, dependsOn: WorkItemRef): Promise<void>;
+  /** Recent backlog slice for duplicate/related detection (capped). */
+  listExistingItems(opts?: ListExistingItemsOptions): Promise<ExistingWorkItem[]>;
 }
 
 export function isTrackerConfigured(config: TrackerConfig | null | undefined): boolean {

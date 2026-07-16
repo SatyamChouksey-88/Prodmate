@@ -24,8 +24,10 @@ import {
   apiGetHistory,
   apiDeleteHistoryItem,
   apiClearHistory,
+  apiBacklogMatches,
   type ApiUser,
   type ExportedWorkItem,
+  type BacklogMatch,
 } from './services/apiClient';
 import Header from './components/Header';
 import InputArea from './components/InputArea';
@@ -96,6 +98,9 @@ const App: React.FC = () => {
   const [progressMessage, setProgressMessage] = useState('');
   const [exportedItems, setExportedItems] = useState<ExportedWorkItem[] | null>(null);
   const [exportPartial, setExportPartial] = useState(false);
+  const [backlogMatches, setBacklogMatches] = useState<BacklogMatch[] | null>(null);
+  const [backlogScanned, setBacklogScanned] = useState<number | null>(null);
+  const [checkingBacklog, setCheckingBacklog] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
   const clientIntegrationsEnabled = !apiMode && isInsecureClientIntegrationsEnabled();
@@ -418,6 +423,21 @@ const App: React.FC = () => {
     persistDemoHistory,
   ]);
 
+  const handleCheckBacklog = useCallback(async () => {
+    if (!results || !apiMode) return;
+    setCheckingBacklog(true);
+    setError(null);
+    try {
+      const data = await apiBacklogMatches(results);
+      setBacklogMatches(data.matches);
+      setBacklogScanned(data.scanned);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Backlog check failed');
+    } finally {
+      setCheckingBacklog(false);
+    }
+  }, [results, apiMode]);
+
   const handleDeleteHistory = async (item: HistoryItem) => {
     const { next, removed, index } = removeById(history, item.id);
     if (!removed) return;
@@ -551,6 +571,10 @@ const App: React.FC = () => {
                   exportDisabled={!trackerReady}
                   exportedItems={exportedItems}
                   exportPartial={exportPartial}
+                  onCheckBacklog={apiMode && trackerReady ? handleCheckBacklog : undefined}
+                  isCheckingBacklog={checkingBacklog}
+                  backlogMatches={backlogMatches}
+                  backlogScanned={backlogScanned}
                 />
               )}
               {!isLoading && status !== 'error' && !results && <WelcomeMessage />}

@@ -254,5 +254,49 @@ export function createJiraAdapter(
         throw new Error(`Failed to link Jira dependency (Status: ${response.status})`);
       }
     },
+
+    async listExistingItems(listOpts) {
+      const limit = Math.min(Math.max(listOpts?.limit ?? 100, 1), 100);
+      const response = await jiraFetch(
+        `${base}/rest/api/3/search/jql`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: auth,
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            jql: `project = ${JSON.stringify(config.projectKey)} ORDER BY updated DESC`,
+            maxResults: limit,
+            fields: ['summary', 'description'],
+          }),
+        },
+        opts.signal
+      );
+      if (!response.ok) {
+        throw new Error(`Jira search failed (Status: ${response.status})`);
+      }
+      const data = (await response.json()) as {
+        issues?: Array<{
+          id: string;
+          key: string;
+          fields?: { summary?: string; description?: unknown };
+        }>;
+      };
+      return (data.issues ?? []).map((issue) => {
+        const desc = issue.fields?.description;
+        let description: string | undefined;
+        if (typeof desc === 'string') description = desc;
+        else if (desc && typeof desc === 'object') description = JSON.stringify(desc).slice(0, 2000);
+        return {
+          id: String(issue.id),
+          key: issue.key,
+          title: issue.fields?.summary ?? issue.key,
+          description,
+          url: `${base}/browse/${issue.key}`,
+        };
+      });
+    },
   };
 }

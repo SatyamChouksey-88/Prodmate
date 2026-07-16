@@ -233,5 +233,60 @@ export function createClickUpAdapter(
         throw new Error(`Failed to link ClickUp dependency (Status: ${response.status})`);
       }
     },
+
+    async listExistingItems(listOpts) {
+      const limit = Math.min(Math.max(listOpts?.limit ?? 100, 1), 100);
+      // Resolve workspace (team) id from Space — required by Filtered Team Tasks.
+      const spaceRes = await clickUpFetch(
+        `${API_BASE}/space/${encodeURIComponent(spaceId)}`,
+        { method: 'GET', headers },
+        opts.signal
+      );
+      if (!spaceRes.ok) {
+        throw new Error(`ClickUp get space failed (Status: ${spaceRes.status})`);
+      }
+      const space = (await spaceRes.json()) as { team_id?: string | number };
+      const teamId = space.team_id != null ? String(space.team_id) : '';
+      if (!teamId) {
+        throw new Error('ClickUp space did not return team_id; cannot list backlog.');
+      }
+
+      const collected: Array<{
+        id: string;
+        name?: string;
+        description?: string;
+        markdown_description?: string;
+        url?: string;
+      }> = [];
+      let page = 0;
+      while (collected.length < limit) {
+        const url =
+          `${API_BASE}/team/${encodeURIComponent(teamId)}/task` +
+          `?space_ids[]=${encodeURIComponent(spaceId)}` +
+          `&order_by=updated&reverse=true&subtasks=true` +
+          `&include_markdown_description=true&page=${page}`;
+        const res = await clickUpFetch(url, { method: 'GET', headers }, opts.signal);
+        if (!res.ok) {
+          throw new Error(`ClickUp filtered tasks failed (Status: ${res.status})`);
+        }
+        const data = (await res.json()) as {
+          tasks?: typeof collected;
+          last_page?: boolean;
+        };
+        const tasks = data.tasks ?? [];
+        if (!tasks.length) break;
+        collected.push(...tasks);
+        if (data.last_page || tasks.length === 0) break;
+        page += 1;
+        if (page > 20) break;
+      }
+
+      return collected.slice(0, limit).map((task) => ({
+        id: String(task.id),
+        title: task.name ?? task.id,
+        description: task.markdown_description || task.description,
+        url: task.url ?? `https://app.clickup.com/t/${task.id}`,
+      }));
+    },
   };
 }

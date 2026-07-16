@@ -274,5 +274,55 @@ export function createAzureDevOpsAdapter(config: AzureDevOpsConfig): WorkItemTra
         );
       }
     },
+
+    async listExistingItems(listOpts) {
+      const limit = Math.min(Math.max(listOpts?.limit ?? 100, 1), 100);
+      const wiqlUrl = `${getApiBaseUrl(config.orgUrl, config.project)}/wiql?$top=${limit}&api-version=7.1`;
+      const wiqlRes = await adoFetch(wiqlUrl, {
+        method: 'POST',
+        headers: {
+          Authorization: getAuthHeader(config.pat),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query: `SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = '${config.project.replace(/'/g, "''")}' AND [System.WorkItemType] IN ('User Story', 'Bug', 'Feature', 'Product Backlog Item') ORDER BY [System.ChangedDate] DESC`,
+        }),
+      });
+      if (!wiqlRes.ok) {
+        throw new Error(`ADO WIQL list failed (Status: ${wiqlRes.status})`);
+      }
+      const wiqlData = await wiqlRes.json();
+      const ids = ((wiqlData.workItems ?? []) as Array<{ id: number }>).map((w) => w.id).slice(0, limit);
+      if (!ids.length) return [];
+
+      const batchRes = await adoFetch(
+        `${getApiBaseUrl(config.orgUrl, config.project)}/workitemsbatch?api-version=7.1`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: getAuthHeader(config.pat),
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            ids,
+            fields: ['System.Id', 'System.Title', 'System.Description'],
+          }),
+        }
+      );
+      if (!batchRes.ok) {
+        throw new Error(`ADO work items batch failed (Status: ${batchRes.status})`);
+      }
+      const batch = await batchRes.json();
+      return ((batch.value ?? []) as Array<{
+        id: number;
+        url?: string;
+        fields?: Record<string, string>;
+      }>).map((item) => ({
+        id: String(item.id),
+        title: item.fields?.['System.Title'] ?? `(#${item.id})`,
+        description: item.fields?.['System.Description'],
+        url: item.url ?? `${config.orgUrl}/_workitems/edit/${item.id}`,
+      }));
+    },
   };
 }
