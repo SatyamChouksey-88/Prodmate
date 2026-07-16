@@ -39,7 +39,12 @@ export const config = {
    * Costlier than export (up to 100+ embedding calls); keep tighter than exportLimit.
    */
   rateLimitBacklogCheckMax: optionalInt('RATE_LIMIT_BACKLOG_CHECK_PER_HOUR', 10),
-  /** Soft retention for audit_logs; pruned via `npm run audit:prune`. */
+  /**
+   * Per-user read/interaction cap (metrics + collab). Not a Gemini-cost path —
+   * generous default (120/hour).
+   */
+  rateLimitInteractionMax: optionalInt('RATE_LIMIT_INTERACTION_PER_HOUR', 120),
+  /** Soft retention for audit_logs; pruned via `npm run audit:prune` (also prunes expired sessions). */
   auditRetentionDays: optionalInt('AUDIT_RETENTION_DAYS', 90),
   /** Gemini generateContent ceiling (ms). */
   geminiTimeoutMs: optionalInt('GEMINI_TIMEOUT_MS', 120_000),

@@ -47,6 +47,12 @@ export async function destroySession(sessionId: string): Promise<void> {
   await query(`DELETE FROM sessions WHERE id = $1`, [sessionId]);
 }
 
+/** Delete expired session rows (cron + opportunistic login prune). */
+export async function pruneExpiredSessions(): Promise<number> {
+  const result = await query(`DELETE FROM sessions WHERE expires_at < now()`);
+  return result.rowCount ?? 0;
+}
+
 export async function loadUserFromSession(sessionId: string): Promise<AuthUser | null> {
   const result = await query<{
     id: string;

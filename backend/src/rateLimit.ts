@@ -16,6 +16,7 @@ export async function registerRateLimits(app: FastifyInstance): Promise<{
   exportLimit: RateLimitPreHandler;
   knowledgeIngestLimit: RateLimitPreHandler;
   backlogCheckLimit: RateLimitPreHandler;
+  interactionLimit: RateLimitPreHandler;
 }> {
   await app.register(rateLimit, { global: false });
 
@@ -41,6 +42,12 @@ export async function registerRateLimits(app: FastifyInstance): Promise<{
     max: config.rateLimitBacklogCheckMax,
     timeWindow: '1 hour',
     keyGenerator: (request) => `backlog-check:${request.user!.id}`,
+  });
+
+  const checkInteraction = app.createRateLimit({
+    max: config.rateLimitInteractionMax,
+    timeWindow: '1 hour',
+    keyGenerator: (request) => `interaction:${request.user!.id}`,
   });
 
   const generateLimit: RateLimitPreHandler = async (request, reply) => {
@@ -83,5 +90,21 @@ export async function registerRateLimits(app: FastifyInstance): Promise<{
     }
   };
 
-  return { generateLimit, exportLimit, knowledgeIngestLimit, backlogCheckLimit };
+  const interactionLimit: RateLimitPreHandler = async (request, reply) => {
+    const result = await checkInteraction(request);
+    if (result.isAllowed === false && result.isExceeded) {
+      return reply.code(429).send({
+        error: `Interaction rate limit exceeded (${config.rateLimitInteractionMax}/hour). Try again later.`,
+        ttlMs: result.ttl,
+      });
+    }
+  };
+
+  return {
+    generateLimit,
+    exportLimit,
+    knowledgeIngestLimit,
+    backlogCheckLimit,
+    interactionLimit,
+  };
 }

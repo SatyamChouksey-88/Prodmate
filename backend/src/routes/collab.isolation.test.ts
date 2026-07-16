@@ -97,7 +97,8 @@ describe('collab/notes isolation (user_id via generation ownership)', () => {
     const { collabRoutes } = await import('./collab.js');
     app = Fastify();
     await app.register(cookie, { secret: process.env.SESSION_SECRET });
-    await collabRoutes(app);
+    const noopLimit = async () => undefined;
+    await collabRoutes(app, { interactionLimit: noopLimit });
     await app.ready();
   }, 120_000);
 

@@ -4,20 +4,26 @@ import { requireAuth } from '../auth/session.js';
 import { writeAudit } from '../audit/log.js';
 import { query } from '../db/pool.js';
 import { computeMetricsSummary } from '../metrics/summary.js';
+import type { RateLimitPreHandler } from '../rateLimit.js';
 
 const rangeSchema = z.object({
   from: z.string().datetime().optional(),
   to: z.string().datetime().optional(),
 });
 
-export async function metricsRoutes(app: FastifyInstance) {
+export async function metricsRoutes(
+  app: FastifyInstance,
+  opts: { interactionLimit: RateLimitPreHandler }
+) {
+  const gate = [requireAuth, opts.interactionLimit];
+
   /**
    * Fire-and-forget metrics ping when a user commits a manual field edit in review.
    * Distinct from LLM refine (`editKind: 'refine'`); dashboard sums both under review.edit.
    */
   app.post(
     '/api/generations/:id/edit-ping',
-    { preHandler: requireAuth },
+    { preHandler: gate },
     async (request, reply) => {
       const { id } = request.params as { id: string };
       const owned = await query(
@@ -35,7 +41,7 @@ export async function metricsRoutes(app: FastifyInstance) {
     }
   );
 
-  app.get('/api/metrics/summary', { preHandler: requireAuth }, async (request, reply) => {
+  app.get('/api/metrics/summary', { preHandler: gate }, async (request, reply) => {
     const parsed = rangeSchema.safeParse(request.query);
     if (!parsed.success) {
       return reply.code(400).send({ error: parsed.error.flatten() });

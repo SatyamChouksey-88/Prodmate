@@ -56,6 +56,28 @@ VITE_API_URL=http://localhost:4000
 - Email + password; passwords hashed with **bcrypt cost 12**
 - Session cookie `prodmate_session`: `HttpOnly`, `SameSite=Lax`, `Secure` when `NODE_ENV=production`
 - No MFA / refresh-token rotation in this phase
+- Expired sessions: pruned by `npm run audit:prune` (`DELETE FROM sessions WHERE expires_at < now()`) and opportunistically on successful login
+
+## Retention / prune
+
+```bash
+npm run audit:prune
+```
+
+Deletes:
+
+1. `audit_logs` older than `AUDIT_RETENTION_DAYS` (default 90)
+2. `sessions` where `expires_at < now()`
+
+## Rate limits (per authenticated user, in-memory)
+
+| Env | Default | Applies to |
+|-----|---------|------------|
+| `RATE_LIMIT_GENERATE_PER_HOUR` | 10 | `POST /api/generate` |
+| `RATE_LIMIT_EXPORT_PER_HOUR` | 30 | export |
+| `RATE_LIMIT_KNOWLEDGE_INGEST_PER_HOUR` | 20 | knowledge ingest |
+| `RATE_LIMIT_BACKLOG_CHECK_PER_HOUR` | 10 | backlog match |
+| `RATE_LIMIT_INTERACTION_PER_HOUR` | 120 | metrics + collab/notes (read/interaction; not Gemini-cost) |
 
 ## Main routes
 

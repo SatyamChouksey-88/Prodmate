@@ -7,6 +7,7 @@ import {
   clearSessionCookie,
   createSession,
   destroySession,
+  pruneExpiredSessions,
   requireAuth,
   setSessionCookie,
   SESSION_COOKIE,
@@ -86,6 +87,10 @@ export async function authRoutes(app: FastifyInstance) {
     const sessionId = await createSession(row.id);
     setSessionCookie(reply, sessionId);
     await writeAudit(row.id, 'auth.login', { email: row.email });
+    // Opportunistic: keep sessions table from growing unbounded (also via npm run audit:prune).
+    void pruneExpiredSessions().catch((err) => {
+      console.error('pruneExpiredSessions failed', err);
+    });
     return {
       user: { id: row.id, email: row.email, name: row.name, role: row.role },
     };

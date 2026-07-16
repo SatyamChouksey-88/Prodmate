@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { requireAuth } from '../auth/session.js';
 import { query } from '../db/pool.js';
 import { writeAudit } from '../audit/log.js';
+import type { RateLimitPreHandler } from '../rateLimit.js';
 
 async function assertOwnsGeneration(userId: string, generationId: string): Promise<boolean> {
   const result = await query(
@@ -12,14 +13,19 @@ async function assertOwnsGeneration(userId: string, generationId: string): Promi
   return (result.rowCount ?? 0) > 0;
 }
 
-export async function collabRoutes(app: FastifyInstance) {
+export async function collabRoutes(
+  app: FastifyInstance,
+  opts: { interactionLimit: RateLimitPreHandler }
+) {
+  const gate = [requireAuth, opts.interactionLimit];
+
   /**
    * Batch notes for a generation (keyed by storyId on each row).
    * Prefer this over per-story GET to avoid N+1 from the review UI.
    */
   app.get(
     '/api/generations/:id/notes',
-    { preHandler: requireAuth },
+    { preHandler: gate },
     async (request, reply) => {
       const { id } = request.params as { id: string };
       if (!(await assertOwnsGeneration(request.user!.id, id))) {
@@ -52,7 +58,7 @@ export async function collabRoutes(app: FastifyInstance) {
 
   app.get(
     '/api/generations/:id/stories/:storyId/notes',
-    { preHandler: requireAuth },
+    { preHandler: gate },
     async (request, reply) => {
       const { id, storyId } = request.params as { id: string; storyId: string };
       if (!(await assertOwnsGeneration(request.user!.id, id))) {
@@ -84,7 +90,7 @@ export async function collabRoutes(app: FastifyInstance) {
 
   app.post(
     '/api/generations/:id/stories/:storyId/notes',
-    { preHandler: requireAuth },
+    { preHandler: gate },
     async (request, reply) => {
       const { id, storyId } = request.params as { id: string; storyId: string };
       const body = z.object({ body: z.string().min(1).max(4000) }).safeParse(request.body);
@@ -114,7 +120,7 @@ export async function collabRoutes(app: FastifyInstance) {
 
   app.get(
     '/api/generations/:id/collab',
-    { preHandler: requireAuth },
+    { preHandler: gate },
     async (request, reply) => {
       const { id } = request.params as { id: string };
       if (!(await assertOwnsGeneration(request.user!.id, id))) {
@@ -143,7 +149,7 @@ export async function collabRoutes(app: FastifyInstance) {
 
   app.patch(
     '/api/generations/:id/stories/:storyId/collab',
-    { preHandler: requireAuth },
+    { preHandler: gate },
     async (request, reply) => {
       const { id, storyId } = request.params as { id: string; storyId: string };
       const body = z
