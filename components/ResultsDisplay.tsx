@@ -1,12 +1,91 @@
-import React, { useState } from 'react';
+import React, { useEffect, useId, useState } from 'react';
 import type { Epic, Feature, UserStory } from '../types';
 import type { ExportedWorkItem } from '../services/apiClient';
+
+/**
+ * Band 4 — local draft state (commit on blur), not React.memo.
+ *
+ * Why: memo on cards only skips sibling re-renders; each keystroke still called
+ * `setResults` in App and re-rendered Header/Settings/History/InputArea. Draft
+ * fields keep typing local until blur, so App state (and the rest of the tree)
+ * only updates when an edit is committed.
+ */
 
 const ChevronDownIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 transition-transform duration-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
   </svg>
 );
+
+const fieldClass =
+  'w-full bg-surface-muted border border-border rounded-md px-2 py-1 text-foreground focus:ring-2 focus:ring-accent focus:outline-none';
+
+const DraftInput: React.FC<{
+  id: string;
+  label: string;
+  value: string;
+  onCommit: (value: string) => void;
+  className?: string;
+  stopPropagation?: boolean;
+}> = ({ id, label, value, onCommit, className = '', stopPropagation }) => {
+  const [draft, setDraft] = useState(value);
+  useEffect(() => {
+    setDraft(value);
+  }, [value]);
+
+  return (
+    <div className="mt-1">
+      <label htmlFor={id} className="block text-xs font-medium text-foreground-muted mb-1">
+        {label}
+      </label>
+      <input
+        id={id}
+        type="text"
+        value={draft}
+        onClick={stopPropagation ? (e) => e.stopPropagation() : undefined}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={() => {
+          if (draft !== value) onCommit(draft);
+        }}
+        className={`${fieldClass} ${className}`}
+      />
+    </div>
+  );
+};
+
+const DraftTextarea: React.FC<{
+  id: string;
+  label: string;
+  value: string;
+  onCommit: (value: string) => void;
+  rows?: number;
+  className?: string;
+  stopPropagation?: boolean;
+}> = ({ id, label, value, onCommit, rows = 2, className = '', stopPropagation }) => {
+  const [draft, setDraft] = useState(value);
+  useEffect(() => {
+    setDraft(value);
+  }, [value]);
+
+  return (
+    <div className="mt-1">
+      <label htmlFor={id} className="block text-xs font-medium text-foreground-muted mb-1">
+        {label}
+      </label>
+      <textarea
+        id={id}
+        value={draft}
+        rows={rows}
+        onClick={stopPropagation ? (e) => e.stopPropagation() : undefined}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={() => {
+          if (draft !== value) onCommit(draft);
+        }}
+        className={`${fieldClass} ${className}`}
+      />
+    </div>
+  );
+};
 
 const Tag: React.FC<{ label: string; value: 'High' | 'Medium' | 'Low' }> = ({ label, value }) => {
   const colorClasses = {
@@ -29,6 +108,7 @@ const UserStoryCard: React.FC<{
   editable: boolean;
   onChange: (story: UserStory) => void;
 }> = ({ story, editable, onChange }) => {
+  const storyFieldId = useId();
   const handleCopy = () => {
     let textToCopy = `User Story (${story.id}): ${story.story}\n`;
     textToCopy += `Business Value: ${story.business_value}, Risk/Impact: ${story.risk_impact}\n\n`;
@@ -46,11 +126,13 @@ const UserStoryCard: React.FC<{
             User Story <span className="text-xs font-mono text-foreground-muted">({story.id})</span>
           </p>
           {editable ? (
-            <textarea
+            <DraftTextarea
+              id={storyFieldId}
+              label="Story text"
               value={story.story}
-              onChange={(e) => onChange({ ...story, story: e.target.value })}
               rows={2}
-              className="w-full text-foreground-secondary italic mb-3 p-2 bg-surface-muted border border-border rounded-md focus:ring-2 focus:ring-accent focus:outline-none"
+              className="italic text-foreground-secondary"
+              onCommit={(storyText) => onChange({ ...story, story: storyText })}
             />
           ) : (
             <p className="text-foreground-secondary italic mb-3">"{story.story}"</p>
@@ -60,6 +142,7 @@ const UserStoryCard: React.FC<{
           type="button"
           onClick={handleCopy}
           title="Copy details"
+          aria-label={`Copy user story ${story.id}`}
           className="absolute top-3 right-3 p-1.5 bg-surface-muted rounded-md text-foreground-muted hover:bg-border hover:text-foreground opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -68,7 +151,7 @@ const UserStoryCard: React.FC<{
         </button>
       </div>
 
-      <div className="flex flex-wrap gap-x-4 gap-y-2 mb-4">
+      <div className="flex flex-wrap gap-x-4 gap-y-2 mb-4 mt-3">
         <Tag label="Business Value" value={story.business_value} />
         <Tag label="Risk/Impact" value={story.risk_impact} />
       </div>
@@ -101,6 +184,8 @@ const FeatureCard: React.FC<{
   onChange: (feature: Feature) => void;
 }> = ({ feature, editable, onChange }) => {
   const [isOpen, setIsOpen] = useState(true);
+  const titleId = useId();
+  const descId = useId();
   return (
     <div className="bg-surface border border-border rounded-lg overflow-hidden">
       <button
@@ -111,25 +196,29 @@ const FeatureCard: React.FC<{
         <div className="text-left flex-1">
           <p className="text-sm text-accent font-medium">Feature</p>
           {editable ? (
-            <input
-              value={feature.feature}
-              onClick={(e) => e.stopPropagation()}
-              onChange={(e) => onChange({ ...feature, feature: e.target.value })}
-              className="mt-1 w-full text-lg font-bold text-foreground bg-surface border border-border rounded-md px-2 py-1 focus:ring-2 focus:ring-accent focus:outline-none"
-            />
+            <>
+              <DraftInput
+                id={titleId}
+                label="Feature title"
+                value={feature.feature}
+                stopPropagation
+                className="text-lg font-bold"
+                onCommit={(featureTitle) => onChange({ ...feature, feature: featureTitle })}
+              />
+              <DraftTextarea
+                id={descId}
+                label="Feature description"
+                value={feature.feature_description}
+                stopPropagation
+                className="text-sm text-foreground-secondary"
+                onCommit={(feature_description) => onChange({ ...feature, feature_description })}
+              />
+            </>
           ) : (
-            <h3 className="text-lg font-bold text-foreground">{feature.feature}</h3>
-          )}
-          {editable ? (
-            <textarea
-              value={feature.feature_description}
-              onClick={(e) => e.stopPropagation()}
-              onChange={(e) => onChange({ ...feature, feature_description: e.target.value })}
-              rows={2}
-              className="mt-2 w-full text-sm text-foreground-secondary bg-surface border border-border rounded-md px-2 py-1 focus:ring-2 focus:ring-accent focus:outline-none"
-            />
-          ) : (
-            <p className="text-sm text-foreground-secondary mt-1">{feature.feature_description}</p>
+            <>
+              <h3 className="text-lg font-bold text-foreground">{feature.feature}</h3>
+              <p className="text-sm text-foreground-secondary mt-1">{feature.feature_description}</p>
+            </>
           )}
         </div>
         <div className={`text-foreground-muted ${isOpen ? 'rotate-180' : ''}`}>
@@ -162,6 +251,8 @@ const EpicCard: React.FC<{
   onChange: (epic: Epic) => void;
 }> = ({ epic, index, editable, onChange }) => {
   const [isOpen, setIsOpen] = useState(index === 0);
+  const titleId = useId();
+  const descId = useId();
   return (
     <div className="bg-background border-2 border-border rounded-xl overflow-hidden shadow-sm">
       <button
@@ -172,25 +263,29 @@ const EpicCard: React.FC<{
         <div className="text-left flex-1">
           <p className="text-sm text-accent font-semibold tracking-wider uppercase">Epic</p>
           {editable ? (
-            <input
-              value={epic.epic}
-              onClick={(e) => e.stopPropagation()}
-              onChange={(e) => onChange({ ...epic, epic: e.target.value })}
-              className="mt-1 w-full text-2xl font-extrabold text-foreground bg-surface-muted border border-border rounded-md px-2 py-1 focus:ring-2 focus:ring-accent focus:outline-none"
-            />
+            <>
+              <DraftInput
+                id={titleId}
+                label="Epic title"
+                value={epic.epic}
+                stopPropagation
+                className="text-2xl font-extrabold"
+                onCommit={(epicTitle) => onChange({ ...epic, epic: epicTitle })}
+              />
+              <DraftTextarea
+                id={descId}
+                label="Epic description"
+                value={epic.epic_description}
+                stopPropagation
+                className="text-md text-foreground-secondary"
+                onCommit={(epic_description) => onChange({ ...epic, epic_description })}
+              />
+            </>
           ) : (
-            <h2 className="text-2xl font-extrabold text-foreground mt-1">{epic.epic}</h2>
-          )}
-          {editable ? (
-            <textarea
-              value={epic.epic_description}
-              onClick={(e) => e.stopPropagation()}
-              onChange={(e) => onChange({ ...epic, epic_description: e.target.value })}
-              rows={2}
-              className="mt-2 w-full text-md text-foreground-secondary bg-surface-muted border border-border rounded-md px-2 py-1 focus:ring-2 focus:ring-accent focus:outline-none"
-            />
-          ) : (
-            <p className="text-md text-foreground-secondary mt-2">{epic.epic_description}</p>
+            <>
+              <h2 className="text-2xl font-extrabold text-foreground mt-1">{epic.epic}</h2>
+              <p className="text-md text-foreground-secondary mt-2">{epic.epic_description}</p>
+            </>
           )}
         </div>
         <div className={`text-foreground-muted ${isOpen ? 'rotate-180' : ''}`}>
@@ -262,7 +357,7 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                 <button
                   type="button"
                   onClick={onCancel}
-                  className="px-4 py-2 rounded-lg border border-border text-foreground-secondary hover:bg-surface-muted"
+                  className="px-4 py-2 rounded-lg border border-border text-foreground-secondary hover:bg-surface-muted focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-surface focus:ring-accent"
                 >
                   Cancel
                 </button>
@@ -271,7 +366,7 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                 type="button"
                 onClick={onExport}
                 disabled={exportDisabled || isExporting}
-                className="px-5 py-2.5 rounded-lg bg-gradient-to-r from-brand-primary to-brand-secondary text-accent-foreground font-semibold disabled:opacity-50"
+                className="px-5 py-2.5 rounded-lg bg-gradient-to-r from-brand-primary to-brand-secondary text-accent-foreground font-semibold disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-surface focus:ring-accent"
               >
                 {isExporting ? 'Exporting…' : 'Export to tracker'}
               </button>
@@ -279,9 +374,9 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
           </div>
           {isExporting && (
             <p className="text-xs text-warning" role="note">
-              Cancelling stops further client-side work, but does not roll back work items already
-              created in the tracker (including any the server may still finish creating after an
-              API-mode cancel).
+              Cancelling aborts the in-flight request so the server usually stops creating further
+              items (via request close). Work items already written to the tracker are not rolled
+              back.
             </p>
           )}
         </div>

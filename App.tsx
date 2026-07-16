@@ -37,6 +37,7 @@ import Login from './components/Login';
 import HistoryPanel from './components/HistoryPanel';
 import KnowledgePanel from './components/KnowledgePanel';
 import SettingsPanel from './components/SettingsPanel';
+import { removeById, reinsertAt } from './utils/optimisticList';
 
 /** generating → ready (review) → exporting → success | error (retry keeps results) */
 type Status = 'idle' | 'generating' | 'ready' | 'exporting' | 'success' | 'error';
@@ -418,22 +419,23 @@ const App: React.FC = () => {
   ]);
 
   const handleDeleteHistory = async (item: HistoryItem) => {
-    if (apiMode) {
-      try {
-        await apiDeleteHistoryItem(item.id);
-        try {
-          setHistory(await loadApiHistory());
-        } catch (histErr) {
-          setError(histErr instanceof Error ? histErr.message : 'Could not refresh history');
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to delete history item');
-      }
+    const { next, removed, index } = removeById(history, item.id);
+    if (!removed) return;
+
+    // Optimistic: update the list immediately; roll back on API failure.
+    setHistory(next);
+
+    if (!apiMode) {
+      localStorage.setItem(`agile-gen-history-${historyKey}`, JSON.stringify(next));
       return;
     }
-    const updated = history.filter((h) => h.id !== item.id);
-    setHistory(updated);
-    localStorage.setItem(`agile-gen-history-${historyKey}`, JSON.stringify(updated));
+
+    try {
+      await apiDeleteHistoryItem(item.id);
+    } catch (err) {
+      setHistory((prev) => reinsertAt(prev, removed, index));
+      setError(err instanceof Error ? err.message : 'Failed to delete history item');
+    }
   };
 
   const handleClearHistory = async () => {
@@ -490,8 +492,8 @@ const App: React.FC = () => {
         </div>
       )}
       <main className="container mx-auto px-4 py-8 max-w-7xl">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          <aside className="lg:col-span-4 xl:col-span-3 space-y-6 lg:sticky lg:top-8">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-6 md:gap-8 items-start">
+          <aside className="md:col-span-4 xl:col-span-3 space-y-6 md:sticky md:top-8 md:max-h-[calc(100vh-4rem)] md:overflow-y-auto">
             <SettingsPanel
               config={trackerConfig}
               onSave={handleSaveTrackerConfig}
@@ -507,7 +509,7 @@ const App: React.FC = () => {
             />
           </aside>
 
-          <div className="lg:col-span-8 xl:col-span-9">
+          <div className="md:col-span-8 xl:col-span-9">
             <InputArea
               onGenerate={handleGenerate}
               isLoading={isLoading}
