@@ -13,6 +13,43 @@ async function assertOwnsGeneration(userId: string, generationId: string): Promi
 }
 
 export async function collabRoutes(app: FastifyInstance) {
+  /**
+   * Batch notes for a generation (keyed by storyId on each row).
+   * Prefer this over per-story GET to avoid N+1 from the review UI.
+   */
+  app.get(
+    '/api/generations/:id/notes',
+    { preHandler: requireAuth },
+    async (request, reply) => {
+      const { id } = request.params as { id: string };
+      if (!(await assertOwnsGeneration(request.user!.id, id))) {
+        return reply.code(404).send({ error: 'Generation not found' });
+      }
+      const rows = await query<{
+        id: string;
+        story_id: string;
+        body: string;
+        author_user_id: string;
+        created_at: string;
+      }>(
+        `SELECT id, story_id, body, author_user_id, created_at::text
+         FROM generation_story_notes
+         WHERE generation_id = $1
+         ORDER BY created_at ASC`,
+        [id]
+      );
+      return {
+        notes: rows.rows.map((r) => ({
+          id: r.id,
+          storyId: r.story_id,
+          body: r.body,
+          authorUserId: r.author_user_id,
+          createdAt: r.created_at,
+        })),
+      };
+    }
+  );
+
   app.get(
     '/api/generations/:id/stories/:storyId/notes',
     { preHandler: requireAuth },
@@ -36,6 +73,7 @@ export async function collabRoutes(app: FastifyInstance) {
       return {
         notes: rows.rows.map((r) => ({
           id: r.id,
+          storyId,
           body: r.body,
           authorUserId: r.author_user_id,
           createdAt: r.created_at,
@@ -65,6 +103,7 @@ export async function collabRoutes(app: FastifyInstance) {
       return {
         note: {
           id: inserted.rows[0].id,
+          storyId,
           body: body.data.body,
           authorUserId: request.user!.id,
           createdAt: inserted.rows[0].created_at,

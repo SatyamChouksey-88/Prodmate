@@ -1,7 +1,7 @@
 import React, { useEffect, useId, useState } from 'react';
 import type { Epic, Feature, UserStory, StoryPoints } from '../types';
 import { STORY_POINTS_OPTIONS } from '../types';
-import type { ExportedWorkItem, BacklogMatch, StoryCollabItem } from '../services/apiClient';
+import type { ExportedWorkItem, BacklogMatch, StoryCollabItem, StoryNote } from '../services/apiClient';
 import StoryCollabPanel from './StoryCollabPanel';
 
 /**
@@ -123,9 +123,11 @@ const UserStoryCard: React.FC<{
   refining?: boolean;
   generationId?: string;
   collab?: StoryCollabItem | null;
+  notes?: StoryNote[];
   onCollabChange?: (item: StoryCollabItem) => void;
+  onNoteAdded?: (note: StoryNote) => void;
   onFieldEdit?: () => void;
-}> = ({ story, editable, onChange, onRefine, refining, generationId, collab, onCollabChange, onFieldEdit }) => {
+}> = ({ story, editable, onChange, onRefine, refining, generationId, collab, notes, onCollabChange, onNoteAdded, onFieldEdit }) => {
   const storyFieldId = useId();
   const [showRefine, setShowRefine] = useState(false);
   const [instruction, setInstruction] = useState('');
@@ -290,7 +292,9 @@ const UserStoryCard: React.FC<{
           generationId={generationId}
           storyId={story.id}
           collab={collab}
+          notes={notes}
           onCollabChange={onCollabChange}
+          onNoteAdded={onNoteAdded}
         />
       )}
     </div>
@@ -307,7 +311,9 @@ const FeatureCard: React.FC<{
   refiningStoryId?: string | null;
   generationId?: string;
   collabByStory?: Record<string, StoryCollabItem>;
+  notesByStory?: Record<string, StoryNote[]>;
   onCollabChange?: (item: StoryCollabItem) => void;
+  onNoteAdded?: (note: StoryNote) => void;
   onFieldEdit?: () => void;
 }> = ({
   feature,
@@ -319,7 +325,9 @@ const FeatureCard: React.FC<{
   refiningStoryId,
   generationId,
   collabByStory,
+  notesByStory,
   onCollabChange,
+  onNoteAdded,
   onFieldEdit,
 }) => {
   const [isOpen, setIsOpen] = useState(true);
@@ -376,7 +384,9 @@ const FeatureCard: React.FC<{
               refining={refiningStoryId === story.id}
               generationId={generationId}
               collab={collabByStory?.[story.id] ?? null}
+              notes={notesByStory?.[story.id]}
               onCollabChange={onCollabChange}
+              onNoteAdded={onNoteAdded}
               onFieldEdit={onFieldEdit}
               onRefine={
                 onRefineStory
@@ -405,7 +415,9 @@ const EpicCard: React.FC<{
   refiningStoryId?: string | null;
   generationId?: string;
   collabByStory?: Record<string, StoryCollabItem>;
+  notesByStory?: Record<string, StoryNote[]>;
   onCollabChange?: (item: StoryCollabItem) => void;
+  onNoteAdded?: (note: StoryNote) => void;
   onFieldEdit?: () => void;
 }> = ({
   epic,
@@ -416,7 +428,9 @@ const EpicCard: React.FC<{
   refiningStoryId,
   generationId,
   collabByStory,
+  notesByStory,
   onCollabChange,
+  onNoteAdded,
   onFieldEdit,
 }) => {
   const [isOpen, setIsOpen] = useState(index === 0);
@@ -476,7 +490,9 @@ const EpicCard: React.FC<{
               refiningStoryId={refiningStoryId}
               generationId={generationId}
               collabByStory={collabByStory}
+              notesByStory={notesByStory}
               onCollabChange={onCollabChange}
+              onNoteAdded={onNoteAdded}
               onFieldEdit={onFieldEdit}
               onChange={(next) => {
                 const features = epic.features.map((f, fi) => (fi === i ? next : f));
@@ -518,7 +534,9 @@ export interface ResultsDisplayProps {
   isLoadingPreview?: boolean;
   generationId?: string;
   collabByStory?: Record<string, StoryCollabItem>;
+  notesByStory?: Record<string, StoryNote[]>;
   onCollabChange?: (item: StoryCollabItem) => void;
+  onNoteAdded?: (note: StoryNote) => void;
   /** Metrics signal when a Draft field commits a real edit (API mode). */
   onFieldEdit?: () => void;
   reviewHint?: string | null;
@@ -548,7 +566,9 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
   isLoadingPreview = false,
   generationId,
   collabByStory,
+  notesByStory,
   onCollabChange,
+  onNoteAdded,
   onFieldEdit,
   reviewHint = null,
 }) => {
@@ -732,7 +752,9 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
           refiningStoryId={refiningStoryId}
           generationId={generationId}
           collabByStory={collabByStory}
+          notesByStory={notesByStory}
           onCollabChange={onCollabChange}
+          onNoteAdded={onNoteAdded}
           onFieldEdit={onFieldEdit}
           onChange={(next) => {
             if (!onResultsChange) return;

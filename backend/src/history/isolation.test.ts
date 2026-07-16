@@ -2,7 +2,7 @@
  * Phase 4 isolation: generations are scoped by user_id (D9).
  * Runs against embedded Postgres so the SQL contract is real, not mocked away.
  */
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import EmbeddedPostgres from 'embedded-postgres';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -44,7 +44,8 @@ describe('history isolation (user_id scoping)', () => {
     process.env.SESSION_SECRET = 'test-session-secret-at-least-32-chars!!';
     process.env.CREDENTIALS_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString('base64');
 
-    // Dynamic import after env is set so pool picks up DATABASE_URL
+    // Fresh pool/config per suite so multiple embedded-PG tests don't share a stale DATABASE_URL.
+    vi.resetModules();
     const { pool: appPool } = await import('../db/pool.js');
     pool = appPool;
 

@@ -30,11 +30,13 @@ import {
   apiRefineStory,
   apiExportPreview,
   apiGetGenerationCollab,
+  apiGetGenerationNotes,
   apiPingReviewFieldEdit,
   type ApiUser,
   type ExportedWorkItem,
   type BacklogMatch,
   type StoryCollabItem,
+  type StoryNote,
 } from './services/apiClient';
 import Header from './components/Header';
 import InputArea from './components/InputArea';
@@ -116,6 +118,7 @@ const App: React.FC = () => {
   } | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [collabByStory, setCollabByStory] = useState<Record<string, StoryCollabItem>>({});
+  const [notesByStory, setNotesByStory] = useState<Record<string, StoryNote[]>>({});
   const abortRef = useRef<AbortController | null>(null);
 
   const clientIntegrationsEnabled = !apiMode && isInsecureClientIntegrationsEnabled();
@@ -124,18 +127,30 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!apiMode || !generationId) {
       setCollabByStory({});
+      setNotesByStory({});
       return;
     }
     let cancelled = false;
     void (async () => {
       try {
-        const items = await apiGetGenerationCollab(generationId);
+        const [items, notes] = await Promise.all([
+          apiGetGenerationCollab(generationId),
+          apiGetGenerationNotes(generationId),
+        ]);
         if (cancelled) return;
-        const map: Record<string, StoryCollabItem> = {};
-        for (const item of items) map[item.storyId] = item;
-        setCollabByStory(map);
+        const collabMap: Record<string, StoryCollabItem> = {};
+        for (const item of items) collabMap[item.storyId] = item;
+        setCollabByStory(collabMap);
+        const notesMap: Record<string, StoryNote[]> = {};
+        for (const note of notes) {
+          (notesMap[note.storyId] ??= []).push(note);
+        }
+        setNotesByStory(notesMap);
       } catch {
-        if (!cancelled) setCollabByStory({});
+        if (!cancelled) {
+          setCollabByStory({});
+          setNotesByStory({});
+        }
       }
     })();
     return () => {
@@ -690,8 +705,15 @@ const App: React.FC = () => {
                       : undefined
                   }
                   collabByStory={collabByStory}
+                  notesByStory={notesByStory}
                   onCollabChange={(item) =>
                     setCollabByStory((prev) => ({ ...prev, [item.storyId]: item }))
+                  }
+                  onNoteAdded={(note) =>
+                    setNotesByStory((prev) => ({
+                      ...prev,
+                      [note.storyId]: [...(prev[note.storyId] ?? []), note],
+                    }))
                   }
                   reviewHint={reviewHint}
                 />

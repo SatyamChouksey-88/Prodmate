@@ -347,13 +347,29 @@ export function apiPingReviewFieldEdit(generationId: string): void {
   });
 }
 
+export type StoryNote = {
+  id: string;
+  storyId: string;
+  body: string;
+  authorUserId: string;
+  createdAt: string;
+};
+
+/** Batch notes for a generation — one request for the whole review UI. */
+export async function apiGetGenerationNotes(generationId: string): Promise<StoryNote[]> {
+  const data = await api<{ notes: StoryNote[] }>(
+    `/api/generations/${encodeURIComponent(generationId)}/notes`
+  );
+  return data.notes;
+}
+
 export async function apiListStoryNotes(
   generationId: string,
   storyId: string
-): Promise<Array<{ id: string; body: string; authorUserId: string; createdAt: string }>> {
-  const data = await api<{
-    notes: Array<{ id: string; body: string; authorUserId: string; createdAt: string }>;
-  }>(`/api/generations/${encodeURIComponent(generationId)}/stories/${encodeURIComponent(storyId)}/notes`);
+): Promise<StoryNote[]> {
+  const data = await api<{ notes: StoryNote[] }>(
+    `/api/generations/${encodeURIComponent(generationId)}/stories/${encodeURIComponent(storyId)}/notes`
+  );
   return data.notes;
 }
 
@@ -361,13 +377,14 @@ export async function apiAddStoryNote(
   generationId: string,
   storyId: string,
   body: string
-): Promise<{ id: string; body: string; authorUserId: string; createdAt: string }> {
-  const data = await api<{
-    note: { id: string; body: string; authorUserId: string; createdAt: string };
-  }>(`/api/generations/${encodeURIComponent(generationId)}/stories/${encodeURIComponent(storyId)}/notes`, {
-    method: 'POST',
-    body: JSON.stringify({ body }),
-  });
+): Promise<StoryNote> {
+  const data = await api<{ note: StoryNote }>(
+    `/api/generations/${encodeURIComponent(generationId)}/stories/${encodeURIComponent(storyId)}/notes`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ body }),
+    }
+  );
   return data.note;
 }
 

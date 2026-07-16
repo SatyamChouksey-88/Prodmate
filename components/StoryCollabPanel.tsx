@@ -1,27 +1,29 @@
 import React, { useEffect, useState } from 'react';
 import {
   apiAddStoryNote,
-  apiListStoryNotes,
   apiPatchStoryCollab,
   type StoryCollabItem,
+  type StoryNote,
 } from '../services/apiClient';
 
 interface StoryCollabPanelProps {
   generationId: string;
   storyId: string;
   collab?: StoryCollabItem | null;
+  /** Notes for this story — loaded once at App via batch GET /notes (not per-panel). */
+  notes?: StoryNote[];
   onCollabChange?: (item: StoryCollabItem) => void;
+  onNoteAdded?: (note: StoryNote) => void;
 }
 
 const StoryCollabPanel: React.FC<StoryCollabPanelProps> = ({
   generationId,
   storyId,
   collab,
+  notes = [],
   onCollabChange,
+  onNoteAdded,
 }) => {
-  const [notes, setNotes] = useState<
-    Array<{ id: string; body: string; authorUserId: string; createdAt: string }>
-  >([]);
   const [draft, setDraft] = useState('');
   const [assignee, setAssignee] = useState(collab?.assigneeLabel ?? '');
   const [busy, setBusy] = useState(false);
@@ -30,21 +32,6 @@ const StoryCollabPanel: React.FC<StoryCollabPanelProps> = ({
   useEffect(() => {
     setAssignee(collab?.assigneeLabel ?? '');
   }, [collab?.assigneeLabel]);
-
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const list = await apiListStoryNotes(generationId, storyId);
-        if (!cancelled) setNotes(list);
-      } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load notes');
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [generationId, storyId]);
 
   const reviewed = Boolean(collab?.reviewedAt);
 
@@ -142,7 +129,7 @@ const StoryCollabPanel: React.FC<StoryCollabPanelProps> = ({
               setError(null);
               try {
                 const note = await apiAddStoryNote(generationId, storyId, draft.trim());
-                setNotes((prev) => [...prev, note]);
+                onNoteAdded?.(note);
                 setDraft('');
               } catch (err) {
                 setError(err instanceof Error ? err.message : 'Failed to add note');
