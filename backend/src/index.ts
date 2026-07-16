@@ -6,6 +6,7 @@ import { authRoutes } from './auth/routes.js';
 import { generateRoutes } from './routes/generate.js';
 import { exportRoutes } from './routes/export.js';
 import { trackerSettingsRoutes } from './routes/trackerSettings.js';
+import { historyRoutes } from './routes/history.js';
 
 async function main() {
   const app = Fastify({ logger: true });
@@ -25,6 +26,7 @@ async function main() {
   await generateRoutes(app);
   await exportRoutes(app);
   await trackerSettingsRoutes(app);
+  await historyRoutes(app);
 
   await app.listen({ port: config.port, host: '0.0.0.0' });
   console.log(`ProdMate backend listening on :${config.port}`);

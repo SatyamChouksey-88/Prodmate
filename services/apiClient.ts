@@ -1,5 +1,4 @@
-import type { User } from '../types';
-import type { Epic } from '../types';
+import type { User, Epic, HistoryItem } from '../types';
 import type { TrackerConfig } from './trackers';
 
 const apiBase = () => (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '') ?? '';
@@ -103,4 +102,16 @@ export async function apiTestTracker(config: TrackerConfig): Promise<string> {
     body: JSON.stringify(config),
   });
   return data.message;
+}
+
+export async function apiGetHistory(): Promise<HistoryItem[]> {
+  const data = await api<{
+    items: Array<{ id: string; title: string; date: string; data: Epic[] }>;
+  }>('/api/history');
+  return data.items.map((item) => ({
+    id: item.id,
+    title: item.title,
+    date: item.date,
+    data: item.data,
+  }));
 }

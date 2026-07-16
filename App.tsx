@@ -19,6 +19,7 @@ import {
   apiExport,
   apiGetTrackerSettings,
   apiSaveTrackerSettings,
+  apiGetHistory,
   type ApiUser,
 } from './services/apiClient';
 import Header from './components/Header';
@@ -42,6 +43,14 @@ function loadLocalTrackerConfig(userName: string): TrackerConfig | null {
   const legacy = localStorage.getItem(`${LEGACY_ADO_STORAGE_PREFIX}${userName}`);
   if (legacy) return normalizeTrackerConfig(JSON.parse(legacy));
   return null;
+}
+
+async function loadApiHistory(): Promise<HistoryItem[]> {
+  try {
+    return await apiGetHistory();
+  } catch {
+    return [];
+  }
 }
 
 const App: React.FC = () => {
@@ -76,8 +85,7 @@ const App: React.FC = () => {
         } catch {
           setTrackerConfig(null);
         }
-        const userHistory = localStorage.getItem(`agile-gen-history-${user.email || user.name}`);
-        setHistory(userHistory ? JSON.parse(userHistory) : []);
+        setHistory(await loadApiHistory());
       }
       setAuthReady(true);
     })();
@@ -100,9 +108,7 @@ const App: React.FC = () => {
         } catch {
           setTrackerConfig(null);
         }
-        const key = 'email' in user ? user.email : user.name;
-        const userHistory = localStorage.getItem(`agile-gen-history-${key}`);
-        setHistory(userHistory ? JSON.parse(userHistory) : []);
+        setHistory(await loadApiHistory());
       })();
     }
   };
@@ -204,15 +210,19 @@ const App: React.FC = () => {
           });
         }
 
-        const newHistoryItem: HistoryItem = {
-          id: new Date().toISOString(),
-          title: generatedEpics[0]?.epic || 'Untitled Plan',
-          date: new Date().toLocaleString(),
-          data: generatedEpics,
-        };
-        const updatedHistory = [newHistoryItem, ...history];
-        setHistory(updatedHistory);
-        localStorage.setItem(`agile-gen-history-${historyKey}`, JSON.stringify(updatedHistory));
+        if (apiMode) {
+          setHistory(await loadApiHistory());
+        } else {
+          const newHistoryItem: HistoryItem = {
+            id: new Date().toISOString(),
+            title: generatedEpics[0]?.epic || 'Untitled Plan',
+            date: new Date().toLocaleString(),
+            data: generatedEpics,
+          };
+          const updatedHistory = [newHistoryItem, ...history];
+          setHistory(updatedHistory);
+          localStorage.setItem(`agile-gen-history-${historyKey}`, JSON.stringify(updatedHistory));
+        }
 
         setStatus('success');
         setProgressMessage('Generation and export complete!');
