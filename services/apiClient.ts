@@ -78,12 +78,40 @@ export async function apiGenerate(
   requirement: string,
   knowledgeBase: string,
   signal?: AbortSignal
-): Promise<{ generationId: string; epics: Epic[] }> {
+): Promise<{ generationId: string; epics: Epic[]; retrievedChunkCount?: number }> {
   return api('/api/generate', {
     method: 'POST',
     body: JSON.stringify({ requirement, knowledgeBase }),
     signal,
   });
+}
+
+export type KnowledgeDocument = {
+  id: string;
+  title: string;
+  sourceFilename: string | null;
+  createdAt: string;
+  chunkCount: number;
+};
+
+export async function apiListKnowledgeDocuments(): Promise<KnowledgeDocument[]> {
+  const data = await api<{ documents: KnowledgeDocument[] }>('/api/knowledge/documents');
+  return data.documents;
+}
+
+export async function apiIngestKnowledgeDocument(input: {
+  title: string;
+  content: string;
+  sourceFilename?: string | null;
+}): Promise<{ documentId: string; chunkCount: number }> {
+  return api('/api/knowledge/documents', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function apiDeleteKnowledgeDocument(id: string): Promise<void> {
+  await api(`/api/knowledge/documents/${encodeURIComponent(id)}`, { method: 'DELETE' });
 }
 
 export async function apiExport(

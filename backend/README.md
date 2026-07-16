@@ -4,13 +4,15 @@ Minimal Fastify API: auth, Gemini proxy, tracker export.
 
 ## Quick start
 
-1. Start Postgres (optional compose file included — requires Docker):
+1. Start Postgres **with pgvector** (Phase 7 Knowledge Mesh). The compose file uses `pgvector/pgvector:pg16` — plain `postgres` images will fail `CREATE EXTENSION vector`.
 
 ```bash
 docker compose up -d
 ```
 
-Or point `DATABASE_URL` at any Postgres 16+ instance.
+Or point `DATABASE_URL` at any Postgres 16+ instance that has the **vector** extension available.
+
+**Azure Flexible Server:** before migrate, add `vector` to the `azure.extensions` allow-list (Azure Portal → Server parameters → `azure.extensions`, or CLI). Without that, `schema_phase7.sql` cannot create the extension.
 
 2. Copy env and fill secrets:
 
@@ -63,3 +65,22 @@ VITE_API_URL=http://localhost:4000
 - `POST /api/export` (auth required)
 - `POST /api/tracker/test` (auth required)
 - `GET|PUT /api/tracker/settings` (auth required; secrets encrypted at rest)
+- `GET|POST|DELETE /api/knowledge/documents` (auth required; Phase 7 Knowledge Mesh)
+- `GET /api/history` | `DELETE /api/history` | `DELETE /api/history/:id`
+
+## Knowledge Mesh (Phase 7)
+
+- Embeddings: `gemini-embedding-001` at **768** dims with **manual L2-normalize**
+- Chunking: ~600 tokens, ~12% overlap
+- Isolation: every retrieval filters `WHERE user_id = $1` (D9)
+- Manual knowledge textarea on the generate form remains override/fallback
+
+### Isolation test
+
+```bash
+# Requires real Postgres+pgvector (not embedded-postgres)
+set TEST_DATABASE_URL=postgres://prodmate:prodmate@localhost:5432/prodmate
+npm test
+```
+
+If `TEST_DATABASE_URL` is unset, the pgvector isolation suite is **skipped** (not treated as verified).

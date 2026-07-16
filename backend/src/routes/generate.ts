@@ -5,6 +5,7 @@ import { writeAudit } from '../audit/log.js';
 import { generateStoriesServer } from '../services/gemini.js';
 import { query } from '../db/pool.js';
 import type { RateLimitPreHandler } from '../rateLimit.js';
+import { buildKnowledgeContext } from '../knowledge/retrieve.js';
 
 const bodySchema = z.object({
   requirement: z.string().min(1),
@@ -25,10 +26,13 @@ export async function generateRoutes(
       }
 
       try {
-        const epics = await generateStoriesServer(
+        const { knowledgeBase, retrievedCount } = await buildKnowledgeContext(
+          request.user!.id,
           parsed.data.requirement,
           parsed.data.knowledgeBase
         );
+
+        const epics = await generateStoriesServer(parsed.data.requirement, knowledgeBase);
         const title = epics[0]?.epic || 'Untitled Plan';
         const insert = await query<{ id: string }>(
           `INSERT INTO generations (user_id, title, result_json)
@@ -40,8 +44,9 @@ export async function generateRoutes(
         await writeAudit(request.user!.id, 'generate', {
           generationId,
           epicCount: epics.length,
+          retrievedChunkCount: retrievedCount,
         });
-        return { generationId, epics };
+        return { generationId, epics, retrievedChunkCount: retrievedCount };
       } catch (err) {
         console.error(err);
         return reply.code(502).send({

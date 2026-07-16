@@ -70,13 +70,14 @@ npm run typecheck    # tsc --noEmit
 cd backend
 cp .env.example .env   # fill DATABASE_URL, GEMINI_API_KEY, SESSION_SECRET, CREDENTIALS_ENCRYPTION_KEY
 npm install
+# Postgres must include pgvector (docker compose uses pgvector/pgvector:pg16)
 npm run migrate
 npm run dev            # default http://localhost:4000
 npm run typecheck
-npm test
+npm test               # set TEST_DATABASE_URL for live pgvector isolation
 ```
 
-Optional local Postgres without Docker: `npx tsx scripts/start-embedded-pg.ts`
+Optional local Postgres without Docker (no pgvector): `npx tsx scripts/start-embedded-pg.ts` — fine for auth/history, **not** for Knowledge Mesh.
 
 ## Trackers
 

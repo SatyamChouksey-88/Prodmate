@@ -35,6 +35,7 @@ import ErrorMessage from './components/ErrorMessage';
 import WelcomeMessage from './components/WelcomeMessage';
 import Login from './components/Login';
 import HistoryPanel from './components/HistoryPanel';
+import KnowledgePanel from './components/KnowledgePanel';
 import SettingsPanel from './components/SettingsPanel';
 
 /** generating → ready (review) → exporting → success | error (retry keeps results) */
@@ -471,6 +472,7 @@ const App: React.FC = () => {
               integrationsEnabled={canUseIntegrations}
               useApi={apiMode}
             />
+            {apiMode && <KnowledgePanel />}
             <HistoryPanel
               history={history}
               onSelect={handleSelectHistory}

@@ -74,7 +74,9 @@ const InputArea: React.FC<InputAreaProps> = ({
              Knowledge Base (Optional)
             </label>
             <p className="text-sm text-foreground-secondary mb-4">
-            Provide context like past tickets, domain notes, or clarifications to improve story generation.
+            Manual override / fallback: pasted here when you have not ingested Knowledge Mesh docs,
+            or to add extra context on top of retrieved chunks. In API mode, ingest docs in the
+            Knowledge Mesh panel for automatic retrieval.
             </p>
             <textarea
             id="knowledge-base-input"

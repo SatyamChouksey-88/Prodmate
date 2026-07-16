@@ -1,6 +1,6 @@
 # ProdMate — Build Tasks (Shared Ground Truth)
 
-_Last updated: July 16, 2026 (Phase 8)_  
+_Last updated: July 16, 2026 (Phase 7 Knowledge Mesh built; pgvector isolation pending live DB)_  
 _Source of truth for multi-phase work. Update status as phases complete._
 
 ## Status legend
@@ -22,6 +22,8 @@ _Source of truth for multi-phase work. Update status as phases complete._
 | D7 | Start phase order | Phase 0 → 1 → … | **Confirmed** |
 | D8 | Jira Feature mapping | **(c)** Feature as grouping label on Stories; hierarchy is Epic → Story only | **Confirmed** |
 | D9 | Multi-tenancy grain (Phase 4) | **User-level isolation only** (`user_id` on all rows). Org-level multi-tenancy (`orgs` / `org_id`) deferred until multi-company SaaS is a real requirement — not built preemptively. | **Confirmed** |
+| D10 | Knowledge Mesh vector store (Phase 7) | **pgvector** on the existing Azure Database for PostgreSQL (D2) — not a separate vector DB. | **Confirmed** |
+| D11 | Knowledge Mesh embedding model (Phase 7) | **`gemini-embedding-001`** (text-only, GA). Not `gemini-embedding-2` (multimodal) — no multimodal ingestion requirement. | **Confirmed** |
 
 ---
 
@@ -131,16 +133,16 @@ _Source of truth for multi-phase work. Update status as phases complete._
 
 ---
 
-## Phase 7 — Knowledge Mesh (confirm priority first)
+## Phase 7 — Knowledge Mesh
 
-**Outcome:** Org memory — docs ingested once, retrieved automatically, never cross-tenant.
+**Outcome:** User memory — docs ingested once, retrieved automatically; never cross-user (D9: `user_id` isolation, not `org_id`).
 
-**Done when:** One team’s docs never appear in another’s retrieval.
+**Done when:** One user’s docs never appear in another user’s retrieval.
 
-- [ ] Confirm timing with user (**D6**)
-- [ ] Ingestion → chunk → embed → vector store namespaced by `org_id`
-- [ ] Replace/override manual knowledge textarea with RAG
-- [ ] Verify: cross-org retrieval isolation test
+- [x] Confirm timing with user (**D6**) + lock **D10** (pgvector) / **D11** (`gemini-embedding-001`)
+- [x] Ingestion → chunk → embed → vector store namespaced by `user_id` (D9)
+- [x] Augment generate flow with RAG; keep manual knowledge textarea as fallback when nothing ingested
+- [~] Verify: cross-user retrieval isolation test (API-level) — **CODE COMPLETE, NOT LIVE-VERIFIED** (no local Postgres+pgvector; Docker/WSL unavailable). Unit query-shape tests always run. Full HNSW/cosine suite gated on `TEST_DATABASE_URL` (skipped here — not a fake pass).
 
 ---
 
@@ -156,6 +158,57 @@ _Source of truth for multi-phase work. Update status as phases complete._
 - [x] Monitoring option A: structured Fastify `onResponse` / `onError` JSON logs + `/api/health` (no new infra)
 - [x] **Login timing side-channel:** always bcrypt-compare (dummy hash when email missing)
 - [x] Verify: backend `tsc` + tests (timing + isolation); frontend lint/typecheck/tests
+
+---
+
+## Phase 9 — Future Tracker Expansion (queued after Phase 8; not started)
+
+**Outcome:** ProdMate supports the trackers real teams already live in beyond Jira/ADO, without diluting effort on tools with weak backlog-hierarchy fit or conflating tracker export with document/wiki export (a different integration entirely).
+
+**Done when:** The next adapter (per the ranking below) implements `WorkItemTrackerAdapter` to the same bar as Jira/ADO — parent hierarchy, dependency links, value/risk mapping, and a **live-verified** export with evidence (work item IDs/URLs). Do not repeat Phase 2's live-verify gap.
+
+**Tier ranking (Product Owner analysis, 2026-07-16):**
+
+- **Tier 1 — done:** Jira, Azure DevOps.
+- **Tier 2 — next candidates.** Strong `WorkItemTrackerAdapter` fit, high overlap with ProdMate's PO/BA target users: ClickUp, Asana, Monday.com, Linear, YouTrack.
+- **Tier 3 — enterprise/SAFe.** Best semantic fit of all — natively Epic→Feature→Story, zero mapping compromise — but niche market, not urgent: Rally, VersionOne, Targetprocess.
+- **Tier 4 — different integration type, not a tracker adapter.** These are document/wiki targets — exporting a generated backlog here means a formatted requirement doc/wiki page, not tracked work items. Needs its own `DocumentExportAdapter` interface and its own phase; do not conflate with tracker work: Confluence, Notion, SharePoint.
+- **Tier 5 — deprioritized.** Weak fit — flat card structure with the same label-workaround problem Jira has for less payoff, or the wrong tool category entirely (strategy/roadmap, retro/session): Trello, Kanbanize, LeanKit, Aha!, Productboard, Roadmunk, ProductPlan, Miro, Mural, Parabol, EasyRetro, Basecamp, Smartsheet. Wrike and Airtable are the exceptions in this tier — decent APIs, worth a second look if targeting smaller/startup teams later.
+
+- [x] Tier ranking documented (this section) — Product Owner analysis, 2026-07-16
+- [x] Next-adapter pick: **ClickUp** (Product Owner decision, implementation-level — not escalated). Reasoning: ClickUp's native hierarchy is Space→Folder→List→Task→Subtask — four levels, enough to map Epic→Feature→Story cleanly without the label-workaround Jira needed for its mid-tier grouping (D8c). Asana was the other realistic Tier 2 pick, but its native model is Project→Task→Subtask — one level short of a clean 3-tier mapping, closer to Jira's original problem than ClickUp's. ClickUp also has solid free-tier REST API access, which lowers the risk of repeating Phase 2's live-verify gap (no test credentials available) when this phase is actually built.
+- [ ] Scope `ClickUpAdapter`: auth method (API token vs OAuth), `business_value`/`risk_impact` field mapping (custom fields vs tags), List→Task→Subtask ↔ Epic→Feature→Story mapping — not designed yet, starts when this phase is picked up
+- [ ] Implement `ClickUpAdapter` behind the existing `WorkItemTrackerAdapter` — no changes to ADO/Jira adapters
+- [ ] Settings UI: add ClickUp as a third provider option
+- [ ] Verify: live ClickUp test-workspace export with evidence (work item IDs/URLs) — do not mark done on code-completeness alone
+- [ ] Revisit Tier 3/4/5 prioritization once the Tier 2 adapter ships and real user demand signal exists
+
+---
+
+## Phase 10 — Performance & UI Polish (queued after Phase 8; not started)
+
+**Outcome:** A PO using this daily never hits a stall, a silent freeze, or a rough/inconsistent-looking screen — the product feels fast and trustworthy end to end.
+
+**Done when:** Every checklist item below is demonstrable, not just claimed.
+
+**Performance:**
+
+- [ ] Audit every user action (generate, export, retry, history load/delete, tracker connection test) for anything that blocks the UI thread or leaves the user staring at a spinner with no feedback for more than ~1-2s without a progress indicator or step-by-step status — extend Phase 5's export progress-indicator pattern everywhere long operations exist, don't leave gaps
+- [ ] Long-running operations (generate, export) get real server-side timeout + retry/circuit-breaker behavior — nothing hangs indefinitely waiting on Gemini or a tracker API with no ceiling
+- [-] **Escalate, do not decide alone:** if closing the "nothing hangs" gap requires new infra (e.g. a job queue like BullMQ/Redis for generate/export instead of a synchronous request) — that has real cost/ops implications and goes to the human before committing, per standing escalation rules. Everything else in this phase is Product-Owner-decided.
+- [ ] History list paginated or virtualized before it degrades at scale (Phase 5 added delete; confirm the list itself doesn't slow down first — don't wait until delete is the only lever)
+- [ ] Confirm Phase 4's `user_id`-scoped queries (`generations`, `tracker_configs`, `audit_logs`) are actually indexed — state explicitly what's indexed vs assumed, cite the actual index, don't take it on faith
+- [ ] Optimistic UI where safe (e.g. history delete feels instant, rolls back on failure) instead of a round-trip wait per interaction
+- [ ] Quick pass on React state structure in `App.tsx` / `ResultsDisplay` for obvious re-render storms — e.g. whole-tree re-render on every keystroke in the Phase 5 review/edit step
+
+**UI/UX polish:**
+
+- [ ] Consistent spacing and typography scale across every screen — audit ALL components against the Phase 1 design tokens, not just the ones that got attention during feature phases
+- [ ] Every async state has a real UI treatment: loading, empty, error, and success — no screen ever shows nothing or a raw error string
+- [ ] Responsive layout verified at minimum tablet width — untested by any phase so far
+- [ ] Basic accessibility: keyboard navigation works for login, generate, review, export; visible focus states; form inputs have proper labels — not covered in any phase yet
+- [ ] Form/validation feedback is clear and immediate (settings, login, input area) — no silent failures on bad input
+- [ ] Consistent iconography and button/component styling — no visual drift between components built in different phases
 
 ---
 
@@ -227,5 +280,18 @@ _Source of truth for multi-phase work. Update status as phases complete._
 4. **Research applied:** `@fastify/rate-limit` createRateLimit + keyGenerator (official Fastify 5 plugin); bcrypt dummy-hash timing equalization.
 5. **Overrideable / trade-offs:** In-memory rate limits (Redis later for multi-instance). Org invite still deferred (D9). Metrics endpoint (B) / OTel (C) skipped until a consumer exists.
 6. **What's next:** Phase 7 Knowledge Mesh — confirm vector/embed/chunk choices and D9 vs org_id before building.
+
+### Phase 7 — 2026-07-16
+1. **Outcome:** Users ingest docs once; generate retrieves top-k chunks scoped by `user_id`; manual textarea remains override/fallback.
+2. **What changed:**
+   - `schema_phase7.sql` — `vector` extension; `knowledge_documents` / `knowledge_chunks` (`embedding vector(768)`, HNSW cosine); migrate wired
+   - Chunk (~600 tokens, ~12% overlap); `gemini-embedding-001` @ 768 + manual L2-normalize; knowledge routes + RAG in `/api/generate`
+   - Frontend Knowledge Mesh panel (API mode); InputArea helper text for textarea fallback
+   - docker-compose → `pgvector/pgvector:pg16`; Azure `azure.extensions` noted in READMEs / `.env.example`
+   - Always-on query-shape unit tests; HNSW/cosine isolation gated on `TEST_DATABASE_URL`
+3. **How verified:** Frontend lint/typecheck/tests green; backend `tsc` + Vitest green (14 passed). **pgvector isolation: SKIPPED** — no Docker on PATH, no WSL, port 5432 closed, Docker Desktop install blocked on admin UAC. Suite did **not** fake-pass on embedded-postgres.
+4. **Research applied:** Google embedding-001 non-3072 dims require manual normalize; pgvector cosine `<=>` + HNSW `vector_cosine_ops`.
+5. **Overrideable / trade-offs:** 768 dims (storage vs quality); top-k = 5; max 200 chunks per ingest. Live isolation remains open until `TEST_DATABASE_URL` points at real Postgres+pgvector.
+6. **What's next:** Re-run backend tests with `TEST_DATABASE_URL` after Docker/`pgvector` is available; then Phase 9 (ClickUp) or other queued work — wait for review.
 
 _Append further reports below._
