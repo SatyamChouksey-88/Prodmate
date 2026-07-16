@@ -237,6 +237,7 @@ _Source of truth for multi-phase work. Update status as phases complete._
 **Done when:** The metrics dashboard shows real numbers sourced from actual usage data (not fabricated), and each collaboration feature is demonstrable without requiring full RBAC.
 
 - [x] **Metrics/Analytics Dashboard.** Extend Phase 4's `audit_logs` to capture what these specific metrics need: time from generate-start to export-complete, edits made during review (proxy for refinement effort), export count per user/time period. Build a simple dashboard view over this data — reading from existing Postgres does not need escalation; standing up a new analytics stack/warehouse would.
+- [x] **Manual review edits counted (gap fix 2026-07-16).** DraftInput/DraftTextarea blur commits (value !== original) fire `POST /api/generations/:id/edit-ping` → `audit_logs` `review.edit` with `editKind: 'field'` (LLM refine stays `editKind: 'refine'`). Fire-and-forget; does not block UI. Dashboard still sums both under one proxy metric.
 - [x] Dashboard UI is explicit about what's a real measured metric vs. a proxy/estimate — do not overstate precision the underlying data doesn't support (e.g. "edits during review" is a refinement-effort proxy, not a precise time measurement).
 - [x] **Comments/notes on individual generated stories** — lightweight discussion, not full edit history.
 - [x] **Assign a story to a team member** — a simple field, not a permission system.

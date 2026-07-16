@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { requireAuth } from '../auth/session.js';
+import { writeAudit } from '../audit/log.js';
 import { query } from '../db/pool.js';
 
 const rangeSchema = z.object({
@@ -9,6 +10,30 @@ const rangeSchema = z.object({
 });
 
 export async function metricsRoutes(app: FastifyInstance) {
+  /**
+   * Fire-and-forget metrics ping when a user commits a manual field edit in review.
+   * Distinct from LLM refine (`editKind: 'refine'`); dashboard sums both under review.edit.
+   */
+  app.post(
+    '/api/generations/:id/edit-ping',
+    { preHandler: requireAuth },
+    async (request, reply) => {
+      const { id } = request.params as { id: string };
+      const owned = await query(
+        `SELECT 1 FROM generations WHERE id = $1 AND user_id = $2`,
+        [id, request.user!.id]
+      );
+      if ((owned.rowCount ?? 0) === 0) {
+        return reply.code(404).send({ error: 'Generation not found' });
+      }
+      await writeAudit(request.user!.id, 'review.edit', {
+        generationId: id,
+        editKind: 'field',
+      });
+      return reply.code(204).send();
+    }
+  );
+
   app.get('/api/metrics/summary', { preHandler: requireAuth }, async (request, reply) => {
     const parsed = rangeSchema.safeParse(request.query);
     if (!parsed.success) {
@@ -118,7 +143,7 @@ export async function metricsRoutes(app: FastifyInstance) {
           label: 'Review/refine edits',
           value: Number(editProxy.rows[0]?.count ?? 0),
           kind: 'proxy' as const,
-          how: "COUNT of audit_logs where action = 'review.edit' — refinement-effort proxy, not wall-clock editing time",
+          how: "COUNT of audit_logs where action = 'review.edit' (editKind 'field' = manual Draft blur; 'refine' = LLM refine) — refinement-effort proxy, not wall-clock editing time",
         },
       ],
       recentActions: recent.rows,

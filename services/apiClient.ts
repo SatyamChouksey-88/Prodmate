@@ -332,6 +332,21 @@ export async function apiGetMetricsSummary(from?: string, to?: string): Promise<
   return api(`/api/metrics/summary${q ? `?${q}` : ''}`);
 }
 
+/**
+ * Metrics-only signal for a committed manual field edit (Draft blur).
+ * Fire-and-forget — never blocks the UI; failures are ignored.
+ */
+export function apiPingReviewFieldEdit(generationId: string): void {
+  const base = apiBase();
+  if (!base || !generationId) return;
+  void fetch(`${base}/api/generations/${encodeURIComponent(generationId)}/edit-ping`, {
+    method: 'POST',
+    credentials: 'include',
+  }).catch(() => {
+    /* intentionally ignored */
+  });
+}
+
 export async function apiListStoryNotes(
   generationId: string,
   storyId: string

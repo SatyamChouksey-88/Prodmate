@@ -27,9 +27,11 @@ const DraftInput: React.FC<{
   label: string;
   value: string;
   onCommit: (value: string) => void;
+  /** Fired only when blur commits a real change (draft !== value). */
+  onEditCommitted?: () => void;
   className?: string;
   stopPropagation?: boolean;
-}> = ({ id, label, value, onCommit, className = '', stopPropagation }) => {
+}> = ({ id, label, value, onCommit, onEditCommitted, className = '', stopPropagation }) => {
   const [draft, setDraft] = useState(value);
   useEffect(() => {
     setDraft(value);
@@ -47,7 +49,10 @@ const DraftInput: React.FC<{
         onClick={stopPropagation ? (e) => e.stopPropagation() : undefined}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={() => {
-          if (draft !== value) onCommit(draft);
+          if (draft !== value) {
+            onCommit(draft);
+            onEditCommitted?.();
+          }
         }}
         className={`${fieldClass} ${className}`}
       />
@@ -60,10 +65,12 @@ const DraftTextarea: React.FC<{
   label: string;
   value: string;
   onCommit: (value: string) => void;
+  /** Fired only when blur commits a real change (draft !== value). */
+  onEditCommitted?: () => void;
   rows?: number;
   className?: string;
   stopPropagation?: boolean;
-}> = ({ id, label, value, onCommit, rows = 2, className = '', stopPropagation }) => {
+}> = ({ id, label, value, onCommit, onEditCommitted, rows = 2, className = '', stopPropagation }) => {
   const [draft, setDraft] = useState(value);
   useEffect(() => {
     setDraft(value);
@@ -81,7 +88,10 @@ const DraftTextarea: React.FC<{
         onClick={stopPropagation ? (e) => e.stopPropagation() : undefined}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={() => {
-          if (draft !== value) onCommit(draft);
+          if (draft !== value) {
+            onCommit(draft);
+            onEditCommitted?.();
+          }
         }}
         className={`${fieldClass} ${className}`}
       />
@@ -114,7 +124,8 @@ const UserStoryCard: React.FC<{
   generationId?: string;
   collab?: StoryCollabItem | null;
   onCollabChange?: (item: StoryCollabItem) => void;
-}> = ({ story, editable, onChange, onRefine, refining, generationId, collab, onCollabChange }) => {
+  onFieldEdit?: () => void;
+}> = ({ story, editable, onChange, onRefine, refining, generationId, collab, onCollabChange, onFieldEdit }) => {
   const storyFieldId = useId();
   const [showRefine, setShowRefine] = useState(false);
   const [instruction, setInstruction] = useState('');
@@ -142,6 +153,7 @@ const UserStoryCard: React.FC<{
               rows={2}
               className="italic text-foreground-secondary"
               onCommit={(storyText) => onChange({ ...story, story: storyText })}
+              onEditCommitted={onFieldEdit}
             />
           ) : (
             <p className="text-foreground-secondary italic mb-3">"{story.story}"</p>
@@ -296,6 +308,7 @@ const FeatureCard: React.FC<{
   generationId?: string;
   collabByStory?: Record<string, StoryCollabItem>;
   onCollabChange?: (item: StoryCollabItem) => void;
+  onFieldEdit?: () => void;
 }> = ({
   feature,
   editable,
@@ -307,6 +320,7 @@ const FeatureCard: React.FC<{
   generationId,
   collabByStory,
   onCollabChange,
+  onFieldEdit,
 }) => {
   const [isOpen, setIsOpen] = useState(true);
   const titleId = useId();
@@ -329,6 +343,7 @@ const FeatureCard: React.FC<{
                 stopPropagation
                 className="text-lg font-bold"
                 onCommit={(featureTitle) => onChange({ ...feature, feature: featureTitle })}
+                onEditCommitted={onFieldEdit}
               />
               <DraftTextarea
                 id={descId}
@@ -337,6 +352,7 @@ const FeatureCard: React.FC<{
                 stopPropagation
                 className="text-sm text-foreground-secondary"
                 onCommit={(feature_description) => onChange({ ...feature, feature_description })}
+                onEditCommitted={onFieldEdit}
               />
             </>
           ) : (
@@ -361,6 +377,7 @@ const FeatureCard: React.FC<{
               generationId={generationId}
               collab={collabByStory?.[story.id] ?? null}
               onCollabChange={onCollabChange}
+              onFieldEdit={onFieldEdit}
               onRefine={
                 onRefineStory
                   ? (storyId, instruction) =>
@@ -389,6 +406,7 @@ const EpicCard: React.FC<{
   generationId?: string;
   collabByStory?: Record<string, StoryCollabItem>;
   onCollabChange?: (item: StoryCollabItem) => void;
+  onFieldEdit?: () => void;
 }> = ({
   epic,
   index,
@@ -399,6 +417,7 @@ const EpicCard: React.FC<{
   generationId,
   collabByStory,
   onCollabChange,
+  onFieldEdit,
 }) => {
   const [isOpen, setIsOpen] = useState(index === 0);
   const titleId = useId();
@@ -421,6 +440,7 @@ const EpicCard: React.FC<{
                 stopPropagation
                 className="text-2xl font-extrabold"
                 onCommit={(epicTitle) => onChange({ ...epic, epic: epicTitle })}
+                onEditCommitted={onFieldEdit}
               />
               <DraftTextarea
                 id={descId}
@@ -429,6 +449,7 @@ const EpicCard: React.FC<{
                 stopPropagation
                 className="text-md text-foreground-secondary"
                 onCommit={(epic_description) => onChange({ ...epic, epic_description })}
+                onEditCommitted={onFieldEdit}
               />
             </>
           ) : (
@@ -456,6 +477,7 @@ const EpicCard: React.FC<{
               generationId={generationId}
               collabByStory={collabByStory}
               onCollabChange={onCollabChange}
+              onFieldEdit={onFieldEdit}
               onChange={(next) => {
                 const features = epic.features.map((f, fi) => (fi === i ? next : f));
                 onChange({ ...epic, features });
@@ -497,6 +519,8 @@ export interface ResultsDisplayProps {
   generationId?: string;
   collabByStory?: Record<string, StoryCollabItem>;
   onCollabChange?: (item: StoryCollabItem) => void;
+  /** Metrics signal when a Draft field commits a real edit (API mode). */
+  onFieldEdit?: () => void;
   reviewHint?: string | null;
 }
 
@@ -525,6 +549,7 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
   generationId,
   collabByStory,
   onCollabChange,
+  onFieldEdit,
   reviewHint = null,
 }) => {
   return (
@@ -708,6 +733,7 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
           generationId={generationId}
           collabByStory={collabByStory}
           onCollabChange={onCollabChange}
+          onFieldEdit={onFieldEdit}
           onChange={(next) => {
             if (!onResultsChange) return;
             onResultsChange(results.map((e, ei) => (ei === i ? next : e)));

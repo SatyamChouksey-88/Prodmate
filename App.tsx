@@ -30,6 +30,7 @@ import {
   apiRefineStory,
   apiExportPreview,
   apiGetGenerationCollab,
+  apiPingReviewFieldEdit,
   type ApiUser,
   type ExportedWorkItem,
   type BacklogMatch,
@@ -683,6 +684,11 @@ const App: React.FC = () => {
                   onRefineStory={apiMode ? handleRefineStory : undefined}
                   refiningStoryId={refiningStoryId}
                   generationId={apiMode ? generationId : undefined}
+                  onFieldEdit={
+                    apiMode && generationId
+                      ? () => apiPingReviewFieldEdit(generationId)
+                      : undefined
+                  }
                   collabByStory={collabByStory}
                   onCollabChange={(item) =>
                     setCollabByStory((prev) => ({ ...prev, [item.storyId]: item }))
