@@ -1,24 +1,28 @@
 import { assertInsecureClientIntegrationsAllowed } from '../../config/runtimeFlags';
-import { escapeMarkdown } from '../../shared/markdownEscape';
+import {
+  CLICKUP_API_BASE,
+  VALUE_RISK_TAGS,
+  buildDependencyBody,
+  buildEpicListBody,
+  buildFeatureTaskBody,
+  buildSpaceTagCreateBody,
+  buildStoryTaskBody,
+  clampBacklogLimit,
+  clickUpListUrl,
+  clickUpTaskUrl,
+  filteredTeamTasksUrl,
+  mapClickUpTaskToExistingItem,
+} from '../../shared/trackers/clickUp';
 import type {
   ClickUpConfig,
-  StoryDetails,
   WorkItemRef,
   WorkItemTrackerAdapter,
 } from './types';
 
-const API_BASE = 'https://api.clickup.com/api/v2';
+export { VALUE_RISK_TAGS };
+
 /** Demo-mode per-call ceiling (ms); API mode uses server TRACKER_FETCH_TIMEOUT_MS. */
 const FETCH_TIMEOUT_MS = 30_000;
-
-export const VALUE_RISK_TAGS = [
-  'value:High',
-  'value:Medium',
-  'value:Low',
-  'risk:High',
-  'risk:Medium',
-  'risk:Low',
-] as const;
 
 export type AdapterFetchOptions = {
   signal?: AbortSignal;
@@ -60,29 +64,6 @@ async function clickUpFetch(
   }
 }
 
-function valueRiskTags(details: StoryDetails): string[] {
-  const tags: string[] = [];
-  if (details.businessValue) tags.push(`value:${details.businessValue}`);
-  if (details.riskImpact) tags.push(`risk:${details.riskImpact}`);
-  return tags;
-}
-
-/** Escape AI/user prose; keep intentional structure markers we add. */
-function storyMarkdown(details: StoryDetails): string | undefined {
-  const parts: string[] = [];
-  if (details.description?.trim()) parts.push(escapeMarkdown(details.description.trim()));
-  if (details.acceptanceCriteria?.length) {
-    parts.push('## Acceptance Criteria');
-    for (const ac of details.acceptanceCriteria) {
-      parts.push(`- ${escapeMarkdown(ac)}`);
-    }
-  }
-  if (details.storyPoints != null) {
-    parts.push(`Story points: ${details.storyPoints}`);
-  }
-  return parts.length ? parts.join('\n\n') : undefined;
-}
-
 export function createClickUpAdapter(
   config: ClickUpConfig,
   opts: AdapterFetchOptions = {}
@@ -103,7 +84,7 @@ export function createClickUpAdapter(
     if (tagsReady) return tagsReady;
     tagsReady = (async () => {
       const listRes = await clickUpFetch(
-        `${API_BASE}/space/${encodeURIComponent(spaceId)}/tag`,
+        `${CLICKUP_API_BASE}/space/${encodeURIComponent(spaceId)}/tag`,
         { method: 'GET', headers: { Authorization: token, Accept: 'application/json' } },
         opts.signal
       );
@@ -118,17 +99,11 @@ export function createClickUpAdapter(
       for (const name of VALUE_RISK_TAGS) {
         if (existing.has(name)) continue;
         const createRes = await clickUpFetch(
-          `${API_BASE}/space/${encodeURIComponent(spaceId)}/tag`,
+          `${CLICKUP_API_BASE}/space/${encodeURIComponent(spaceId)}/tag`,
           {
             method: 'POST',
             headers,
-            body: JSON.stringify({
-              tag: {
-                name,
-                tag_fg: '#ffffff',
-                tag_bg: name.startsWith('value:') ? '#2563eb' : '#b45309',
-              },
-            }),
+            body: JSON.stringify(buildSpaceTagCreateBody(name)),
           },
           opts.signal
         );
@@ -151,7 +126,7 @@ export function createClickUpAdapter(
     body: Record<string, unknown>
   ): Promise<WorkItemRef> {
     const response = await clickUpFetch(
-      `${API_BASE}/list/${encodeURIComponent(listId)}/task`,
+      `${CLICKUP_API_BASE}/list/${encodeURIComponent(listId)}/task`,
       { method: 'POST', headers, body: JSON.stringify(body) },
       opts.signal
     );
@@ -167,7 +142,7 @@ export function createClickUpAdapter(
     const result = (await response.json()) as { id: string; url?: string };
     return {
       id: String(result.id),
-      url: result.url || `https://app.clickup.com/t/${result.id}`,
+      url: clickUpTaskUrl(String(result.id), result.url),
       key: listId,
     };
   }
@@ -178,7 +153,7 @@ export function createClickUpAdapter(
     async testConnection(): Promise<string> {
       assertInsecureClientIntegrationsAllowed('ClickUp connection test');
       const response = await clickUpFetch(
-        `${API_BASE}/space/${encodeURIComponent(spaceId)}`,
+        `${CLICKUP_API_BASE}/space/${encodeURIComponent(spaceId)}`,
         { method: 'GET', headers: { Authorization: token, Accept: 'application/json' } },
         opts.signal
       );
@@ -191,11 +166,9 @@ export function createClickUpAdapter(
     },
 
     async createEpic(title, description) {
-      const body: Record<string, unknown> = { name: title };
-      if (description?.trim()) body.markdown_content = escapeMarkdown(description.trim());
-
+      const body = buildEpicListBody(title, description);
       const response = await clickUpFetch(
-        `${API_BASE}/space/${encodeURIComponent(spaceId)}/list`,
+        `${CLICKUP_API_BASE}/space/${encodeURIComponent(spaceId)}/list`,
         { method: 'POST', headers, body: JSON.stringify(body) },
         opts.signal
       );
@@ -212,29 +185,23 @@ export function createClickUpAdapter(
       const listId = String(result.id);
       return {
         id: listId,
-        url: `https://app.clickup.com/${spaceId}/v/li/${listId}`,
+        url: clickUpListUrl(spaceId, listId),
         key: listId,
       };
     },
 
     async createFeature(title, description, parentEpic) {
       const listId = parentEpic.id;
-      const body: Record<string, unknown> = { name: title };
-      if (description?.trim()) body.markdown_description = escapeMarkdown(description.trim());
-      return createTaskInList(listId, body);
+      return createTaskInList(listId, buildFeatureTaskBody(title, description));
     },
 
     async createUserStory(title, details, parent) {
       await ensureValueRiskTags();
       const listId = parent.key || parent.id;
-      const body: Record<string, unknown> = {
-        name: title,
-        parent: parent.id,
-        tags: valueRiskTags(details),
-      };
-      const md = storyMarkdown(details);
-      if (md) body.markdown_description = md;
-      return createTaskInList(listId, body);
+      return createTaskInList(
+        listId,
+        buildStoryTaskBody(title, details, parent.id)
+      );
     },
 
     async linkParent() {
@@ -243,11 +210,11 @@ export function createClickUpAdapter(
 
     async linkDependency(from, dependsOn) {
       const response = await clickUpFetch(
-        `${API_BASE}/task/${encodeURIComponent(from.id)}/dependency`,
+        `${CLICKUP_API_BASE}/task/${encodeURIComponent(from.id)}/dependency`,
         {
           method: 'POST',
           headers,
-          body: JSON.stringify({ depends_on: dependsOn.id }),
+          body: JSON.stringify(buildDependencyBody(dependsOn.id)),
         },
         opts.signal
       );
@@ -257,9 +224,9 @@ export function createClickUpAdapter(
     },
 
     async listExistingItems(listOpts) {
-      const limit = Math.min(Math.max(listOpts?.limit ?? 100, 1), 100);
+      const limit = clampBacklogLimit(listOpts?.limit);
       const spaceRes = await clickUpFetch(
-        `${API_BASE}/space/${encodeURIComponent(spaceId)}`,
+        `${CLICKUP_API_BASE}/space/${encodeURIComponent(spaceId)}`,
         { method: 'GET', headers },
         opts.signal
       );
@@ -281,12 +248,11 @@ export function createClickUpAdapter(
       }> = [];
       let page = 0;
       while (collected.length < limit) {
-        const url =
-          `${API_BASE}/team/${encodeURIComponent(teamId)}/task` +
-          `?space_ids[]=${encodeURIComponent(spaceId)}` +
-          `&order_by=updated&reverse=true&subtasks=true` +
-          `&include_markdown_description=true&page=${page}`;
-        const res = await clickUpFetch(url, { method: 'GET', headers }, opts.signal);
+        const res = await clickUpFetch(
+          filteredTeamTasksUrl(teamId, spaceId, page),
+          { method: 'GET', headers },
+          opts.signal
+        );
         if (!res.ok) {
           throw new Error(`ClickUp filtered tasks failed (Status: ${res.status})`);
         }
@@ -302,12 +268,7 @@ export function createClickUpAdapter(
         if (page > 20) break;
       }
 
-      return collected.slice(0, limit).map((task) => ({
-        id: String(task.id),
-        title: task.name ?? task.id,
-        description: task.markdown_description || task.description,
-        url: task.url ?? `https://app.clickup.com/t/${task.id}`,
-      }));
+      return collected.slice(0, limit).map(mapClickUpTaskToExistingItem);
     },
   };
 }

@@ -13,12 +13,10 @@ describe('Jira/ClickUp markdown escape wiring (FE)', () => {
     expect(src).toMatch(/escapeMarkdown\(text\)/);
   });
 
-  it('clickUpAdapter escapes story/epic/feature markdown fields', () => {
+  it('clickUpAdapter uses shared/trackers/clickUp for markdown fields', () => {
     const src = readFileSync(join(dir, 'clickUpAdapter.ts'), 'utf8');
-    expect(src).toMatch(/from ['"].*markdownEscape['"]/);
-    expect(src).toMatch(/escapeMarkdown\(details\.description/);
-    expect(src).toMatch(/markdown_content = escapeMarkdown/);
-    expect(src).toMatch(/markdown_description = escapeMarkdown/);
+    expect(src).toMatch(/from ['"].*shared\/trackers\/clickUp['"]/);
+    expect(src).toMatch(/buildEpicListBody|buildFeatureTaskBody|buildStoryTaskBody/);
   });
 
   it('escaped heading and link stay non-formatting', () => {
