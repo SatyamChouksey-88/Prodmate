@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import type { HistoryItem } from '../types';
+import { DeleteIcon } from './icons';
 
 interface HistoryPanelProps {
   history: HistoryItem[];
@@ -66,9 +67,9 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({ history, onSelect, onDelete
                         title="Delete"
                         aria-label={`Delete history item ${item.title}`}
                         onClick={() => onDelete(item)}
-                        className="px-2 text-foreground-muted hover:text-danger"
+                        className="px-2 text-foreground-muted hover:text-danger focus:outline-none focus:ring-2 focus:ring-accent rounded-md"
                       >
-                        ×
+                        <DeleteIcon />
                       </button>
                     )}
                   </li>

@@ -5,6 +5,7 @@ import {
   apiListKnowledgeDocuments,
   type KnowledgeDocument,
 } from '../services/apiClient';
+import { DeleteIcon } from './icons';
 
 const KnowledgePanel: React.FC = () => {
   const [isOpen, setIsOpen] = useState(true);
@@ -13,8 +14,10 @@ const KnowledgePanel: React.FC = () => {
   const [content, setContent] = useState('');
   const [sourceFilename, setSourceFilename] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [loadingList, setLoadingList] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{ title?: string; content?: string }>({});
 
   const refresh = useCallback(async () => {
     try {
@@ -22,6 +25,8 @@ const KnowledgePanel: React.FC = () => {
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load knowledge documents');
+    } finally {
+      setLoadingList(false);
     }
   }, []);
 
@@ -31,7 +36,14 @@ const KnowledgePanel: React.FC = () => {
 
   const handleIngest = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim() || !content.trim()) return;
+    const nextErrors: { title?: string; content?: string } = {};
+    if (!title.trim()) nextErrors.title = 'Title is required.';
+    if (!content.trim()) nextErrors.content = 'Content is required.';
+    setFieldErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) {
+      setError('Fix the highlighted fields before ingesting.');
+      return;
+    }
     setBusy(true);
     setError(null);
     setInfo(null);
@@ -44,6 +56,7 @@ const KnowledgePanel: React.FC = () => {
       setTitle('');
       setContent('');
       setSourceFilename(null);
+      setFieldErrors({});
       setInfo(`Ingested ${result.chunkCount} chunk${result.chunkCount === 1 ? '' : 's'}.`);
       await refresh();
     } catch (err) {
@@ -63,6 +76,7 @@ const KnowledgePanel: React.FC = () => {
       if (!title.trim()) {
         setTitle(file.name.replace(/\.[^.]+$/, '') || file.name);
       }
+      setFieldErrors((prev) => ({ ...prev, content: undefined }));
     };
     reader.readAsText(file);
   };
@@ -108,23 +122,49 @@ const KnowledgePanel: React.FC = () => {
             private to your account.
           </p>
 
-          <form onSubmit={handleIngest} className="space-y-3">
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Document title"
-              disabled={busy}
-              className="w-full p-2 bg-surface-muted border border-border rounded-lg text-sm text-foreground focus:ring-2 focus:ring-accent focus:outline-none"
-            />
-            <textarea
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              placeholder="Paste domain notes, past tickets, or policy text…"
-              disabled={busy}
-              rows={4}
-              className="w-full p-2 bg-surface-muted border border-border rounded-lg text-sm text-foreground focus:ring-2 focus:ring-accent focus:outline-none"
-            />
+          <form onSubmit={handleIngest} className="space-y-3" noValidate>
+            <div>
+              <label htmlFor="knowledge-title" className="block text-sm font-medium text-foreground-secondary mb-1">
+                Document title
+              </label>
+              <input
+                id="knowledge-title"
+                type="text"
+                value={title}
+                onChange={(e) => {
+                  setTitle(e.target.value);
+                  if (fieldErrors.title) setFieldErrors((prev) => ({ ...prev, title: undefined }));
+                }}
+                placeholder="e.g. Payment policy notes"
+                disabled={busy}
+                aria-invalid={Boolean(fieldErrors.title)}
+                className={`w-full p-2 bg-surface-muted border rounded-lg text-sm text-foreground focus:ring-2 focus:ring-accent focus:outline-none ${
+                  fieldErrors.title ? 'border-danger' : 'border-border'
+                }`}
+              />
+              {fieldErrors.title && <p className="mt-1 text-xs text-danger">{fieldErrors.title}</p>}
+            </div>
+            <div>
+              <label htmlFor="knowledge-content" className="block text-sm font-medium text-foreground-secondary mb-1">
+                Content
+              </label>
+              <textarea
+                id="knowledge-content"
+                value={content}
+                onChange={(e) => {
+                  setContent(e.target.value);
+                  if (fieldErrors.content) setFieldErrors((prev) => ({ ...prev, content: undefined }));
+                }}
+                placeholder="Paste domain notes, past tickets, or policy text…"
+                disabled={busy}
+                rows={4}
+                aria-invalid={Boolean(fieldErrors.content)}
+                className={`w-full p-2 bg-surface-muted border rounded-lg text-sm text-foreground focus:ring-2 focus:ring-accent focus:outline-none ${
+                  fieldErrors.content ? 'border-danger' : 'border-border'
+                }`}
+              />
+              {fieldErrors.content && <p className="mt-1 text-xs text-danger">{fieldErrors.content}</p>}
+            </div>
             <div className="flex flex-wrap gap-2">
               <label className="text-sm px-3 py-2 rounded-lg border border-border bg-surface-muted hover:bg-border cursor-pointer">
                 Upload .txt / .md
@@ -138,7 +178,7 @@ const KnowledgePanel: React.FC = () => {
               </label>
               <button
                 type="submit"
-                disabled={busy || !title.trim() || !content.trim()}
+                disabled={busy}
                 className="text-sm px-3 py-2 rounded-lg bg-gradient-to-r from-brand-primary to-brand-secondary text-accent-foreground font-semibold disabled:opacity-50"
               >
                 {busy ? 'Working…' : 'Ingest'}
@@ -146,10 +186,14 @@ const KnowledgePanel: React.FC = () => {
             </div>
           </form>
 
-          {error && <p className="text-sm text-danger">{error}</p>}
+          {error && <p className="text-sm text-danger" role="alert">{error}</p>}
           {info && <p className="text-sm text-success">{info}</p>}
 
-          {documents.length > 0 && (
+          {loadingList ? (
+            <p className="text-sm text-foreground-muted">Loading documents…</p>
+          ) : documents.length === 0 ? (
+            <p className="text-sm text-foreground-muted">No documents ingested yet.</p>
+          ) : (
             <ul className="space-y-1 max-h-48 overflow-y-auto">
               {documents.map((doc) => (
                 <li key={doc.id} className="flex items-start gap-1 text-sm">
@@ -166,9 +210,9 @@ const KnowledgePanel: React.FC = () => {
                     aria-label={`Delete knowledge document ${doc.title}`}
                     disabled={busy}
                     onClick={() => void handleDelete(doc)}
-                    className="px-2 text-foreground-muted hover:text-danger"
+                    className="px-2 text-foreground-muted hover:text-danger focus:outline-none focus:ring-2 focus:ring-accent rounded-md disabled:opacity-50"
                   >
-                    ×
+                    <DeleteIcon />
                   </button>
                 </li>
               ))}

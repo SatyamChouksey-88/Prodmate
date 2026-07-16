@@ -10,7 +10,8 @@
     "start": "npm run dev",
     "lint": "eslint .",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "verify:tablet": "node scripts/verify-tablet-layout.mjs"
   },
   "dependencies": {
     "@google/genai": "^1.29.0",
@@ -25,6 +26,7 @@
     "eslint": "^9.28.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "globals": "^16.2.0",
+    "playwright": "^1.61.1",
     "tailwindcss": "^4.3.2",
     "typescript": "~5.8.2",
     "typescript-eslint": "^8.33.0",

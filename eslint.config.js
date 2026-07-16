@@ -12,6 +12,7 @@ export default tseslint.config(
       'coverage/**',
       '.claude/**',
       '.cursor/**',
+      'scripts/**',
     ],
   },
   js.configs.recommended,

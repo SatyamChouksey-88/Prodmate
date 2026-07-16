@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <title>Tablet layout fixture</title>
+  </head>
+  <body class="bg-slate-50">
+    <!-- Mirrors App.tsx main grid classes after band 5: md:grid-cols-12 -->
+    <main class="container mx-auto px-4 py-8 max-w-7xl">
+      <div id="main-grid" class="grid grid-cols-1 md:grid-cols-12 gap-6 md:gap-8 items-start">
+        <aside
+          id="aside"
+          class="md:col-span-4 xl:col-span-3 space-y-6 md:sticky md:top-8 md:max-h-[calc(100vh-4rem)] md:overflow-y-auto"
+        >
+          <div class="bg-white border rounded-xl p-4 min-h-[120px]">Settings</div>
+          <div class="bg-white border rounded-xl p-4 min-h-[80px]">History</div>
+        </aside>
+        <div id="main" class="md:col-span-8 xl:col-span-9">
+          <div class="bg-white border rounded-xl p-6 min-h-[240px]">
+            Input / results — long enough to confirm no horizontal clip at tablet widths.
+          </div>
+        </div>
+      </div>
+    </main>
+  </body>
+</html>

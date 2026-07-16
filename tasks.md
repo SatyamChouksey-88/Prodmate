@@ -1,6 +1,6 @@
 # ProdMate — Build Tasks (Shared Ground Truth)
 
-_Last updated: July 16, 2026 (Phase 9 tag ensure + Phase 10 band 1–2/trivials)_  
+_Last updated: July 16, 2026 (Phase 10 bands 3–5 landed)_  
 _Source of truth for multi-phase work. Update status as phases complete._
 
 ## Status legend
@@ -187,7 +187,7 @@ _Source of truth for multi-phase work. Update status as phases complete._
 
 ---
 
-## Phase 10 — Performance & UI Polish (**band 1+2 + trivials landed 2026-07-16**; bands 3–5 deferred)
+## Phase 10 — Performance & UI Polish (**complete 2026-07-16** — bands 1–5)
 
 **Outcome:** A PO using this daily never hits a stall, a silent freeze, or a rough/inconsistent-looking screen — the product feels fast and trustworthy end to end.
 
@@ -198,19 +198,19 @@ _Source of truth for multi-phase work. Update status as phases complete._
 - [x] Audit every user action — findings recorded; demo export live progress existed; API export now streams NDJSON progress
 - [x] Server-side timeouts + AbortSignal: `GEMINI_TIMEOUT_MS` (default 120s), `EMBEDDING_TIMEOUT_MS` (60s), `TRACKER_FETCH_TIMEOUT_MS` (30s); Gemini/`embedContent` use `abortSignal`; tracker `fetch` uses `timeoutSignal`; client disconnect aborts generate/export. Proven by `backend/src/http/timeout.test.ts` (in-flight hang aborts under 2s).
 - [-] **Escalate, do not decide alone:** BullMQ/Redis **not built** — sync timeouts preferred. Queue only if human escalates.
-- [x] History list scale audit — `LIMIT 100`; pagination deferred (band 3+)
+- [x] History list scale audit — `LIMIT 100`; pagination deferred (not needed at current scale)
 - [x] Confirm `user_id` indexes — all present
-- [ ] Optimistic UI (history delete) — **deferred** (band 3)
-- [x] React re-render audit — fix deferred (band 4)
+- [x] Optimistic UI (history delete) — remove from local state immediately; `reinsertAt` on DELETE failure; proven by `utils/optimisticList.test.ts` forced-failure rollback
+- [x] React re-render — **local draft fields** in ResultsDisplay (commit on blur). Chosen over `React.memo`: memo would still call `setResults` each keystroke and re-render App/sidebar; drafts keep typing local until blur.
 
 **UI/UX polish:**
 
 - [x] Design-token audit
-- [~] Async UI treatments — history empty state + history load errors surfaced; Knowledge spinner/labels deferred
-- [ ] Responsive tablet verify — deferred (band 5)
-- [~] Basic a11y — landed: aria-label on logout / history delete / knowledge delete; Cancel focus ring. Review/Knowledge field labels deferred (band 5)
-- [ ] Form/validation feedback — deferred (band 5)
-- [~] Iconography — Cancel focus ring landed; remaining drift deferred (band 5)
+- [x] Async UI treatments — history empty/errors; Knowledge list loading + empty state + field validation
+- [x] Responsive tablet verify — switched to `md:grid-cols-12` (was `lg:` only); Playwright fixture at 390/768/1280 — stacked on phone, side-by-side on tablet+, no horizontal overflow (`npm run verify:tablet`)
+- [x] Basic a11y — review/edit field labels; Knowledge title/content labels; delete aria-labels + SVG icons; Cancel focus rings
+- [x] Form/validation feedback — Login/Settings/InputArea/Knowledge show immediate messages (no silent disabled-only failure)
+- [x] Iconography — History/Knowledge deletes use shared `DeleteIcon` (Header-aligned SVG), not text ×
 
 ---
 
@@ -353,7 +353,13 @@ _Source of truth for multi-phase work. Update status as phases complete._
 2. **Timeouts:** `timeoutSignal` + env ceilings; Gemini/embeddings `abortSignal`; ADO/Jira/ClickUp fetch abort; generate/export abort on client disconnect. **Verified:** `timeout.test.ts` aborts hung fetch in &lt;2s.
 3. **API export progress:** NDJSON stream (`progress` / `done` / `error`); `apiExport` + App update messages live like demo `onProgress`.
 4. **Trivials:** history empty state; history load errors surfaced; `aria-label` on logout/history/knowledge deletes; Cancel focus ring.
-5. **Deferred:** bands 3–5 (optimistic delete, ResultsDisplay memo, remaining a11y/validation/tablet).
-6. **What's next:** Review; then Phase 10 bands 3–5 or live ClickUp verify when credentials exist.
+5. **Deferred at time of band 1–2:** bands 3–5 — **landed in follow-up** (see report below).
+6. **What's next (at time of band 1–2):** Review; then bands 3–5.
+
+### Phase 10 bands 3–5 — 2026-07-16
+1. **Optimistic history delete:** `removeById` / `reinsertAt` / `optimisticDeleteById`; App removes immediately, rolls back + surfaces error on DELETE failure. **Verified:** `utils/optimisticList.test.ts` forced failure re-inserts the item.
+2. **ResultsDisplay re-renders:** local draft inputs/textareas commit on blur (not React.memo) — documented in component. Export-cancel copy updated for request-close abort wiring.
+3. **Polish:** review + Knowledge field labels; Login/Settings/InputArea/Knowledge validation messages; DeleteIcon; tablet `md:` grid + `verify:tablet` Playwright check OK.
+4. **What's next:** Live ClickUp verify when credentials exist; Phase 11 when prioritized.
 
 _Append further reports below._

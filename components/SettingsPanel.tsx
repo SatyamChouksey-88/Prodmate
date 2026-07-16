@@ -50,6 +50,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [isOpen, setIsOpen] = useState(!config || !isConfigured(config));
   const [formState, setFormState] = useState<TrackerConfig>(config ?? emptyAdo());
   const [isSaved, setIsSaved] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [testMessage, setTestMessage] = useState('');
 
@@ -64,18 +65,61 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     setFormState(emptyForProvider(provider));
     setTestStatus('idle');
     setTestMessage('');
+    setValidationError(null);
+  };
+
+  const missingFieldsMessage = (state: TrackerConfig): string | null => {
+    if (state.provider === 'jira') {
+      const missing: string[] = [];
+      if (!state.baseUrl.trim()) missing.push('Jira Cloud URL');
+      if (!state.projectKey.trim()) missing.push('Project Key');
+      if (!state.email.trim()) missing.push('email');
+      if (!state.apiToken.trim()) missing.push('API token');
+      return missing.length ? `Fill in: ${missing.join(', ')}.` : null;
+    }
+    if (state.provider === 'clickup') {
+      const missing: string[] = [];
+      if (!state.spaceId.trim()) missing.push('Space ID');
+      if (!state.apiToken.trim()) missing.push('personal API token');
+      return missing.length ? `Fill in: ${missing.join(', ')}.` : null;
+    }
+    const missing: string[] = [];
+    if (!state.orgUrl.trim()) missing.push('Organization URL');
+    if (!state.project.trim()) missing.push('Project Name');
+    if (!state.pat.trim()) missing.push('PAT');
+    return missing.length ? `Fill in: ${missing.join(', ')}.` : null;
   };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!integrationsEnabled) return;
+    if (!integrationsEnabled) {
+      setValidationError('Integrations are disabled in this build.');
+      return;
+    }
+    const missing = missingFieldsMessage(formState);
+    if (missing) {
+      setValidationError(missing);
+      return;
+    }
+    setValidationError(null);
     await onSave(formState);
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 2000);
   };
 
   const handleTestConnection = async () => {
-    if (!integrationsEnabled) return;
+    if (!integrationsEnabled) {
+      setValidationError('Integrations are disabled in this build.');
+      return;
+    }
+    const missing = missingFieldsMessage(formState);
+    if (missing) {
+      setValidationError(missing);
+      setTestStatus('error');
+      setTestMessage(missing);
+      return;
+    }
+    setValidationError(null);
     setTestStatus('testing');
     setTestMessage('');
     try {
@@ -94,7 +138,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
   const isFormInvalid = !isConfigured(formState);
   const isTesting = testStatus === 'testing';
-  const actionsDisabled = !integrationsEnabled || isFormInvalid;
+  const actionsDisabled = !integrationsEnabled;
 
   return (
     <div className="bg-surface rounded-xl shadow-sm border border-border">
@@ -125,7 +169,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               <code>VITE_ALLOW_INSECURE_CLIENT_LLM=true</code> in <code>.env.local</code> (dev only).
             </div>
           )}
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4" noValidate>
             <div>
               <label htmlFor="provider" className="block text-sm font-medium text-foreground-secondary">
                 Work tracker
@@ -340,6 +384,16 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               plaintext in localStorage. Do not use against production orgs. Phase 3 moves credentials
               server-side.
             </div>
+            {validationError && (
+              <p className="text-sm text-danger" role="alert">
+                {validationError}
+              </p>
+            )}
+            {integrationsEnabled && isFormInvalid && !validationError && (
+              <p className="text-sm text-foreground-muted">
+                Complete all required fields to save or test the connection.
+              </p>
+            )}
             <div className="flex flex-col sm:flex-row gap-2">
               <button
                 type="submit"

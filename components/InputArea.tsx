@@ -35,19 +35,35 @@ const InputArea: React.FC<InputAreaProps> = ({
     fileInputRef.current?.click();
   };
 
+  const [validationError, setValidationError] = useState<string | null>(null);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLoading) return;
+    if (!integrationsEnabled) {
+      setValidationError(
+        'Client integrations are disabled. Enable via .env.local for local demos, or use API mode.'
+      );
+      return;
+    }
+    if (!text.trim()) {
+      setValidationError('Enter a requirement (or upload a document) before generating.');
+      return;
+    }
+    setValidationError(null);
     onGenerate(text, knowledgeBase);
   };
 
   // Tracker config is required for export, not for generate (review-before-export).
-  const isGenerateDisabled = isLoading || !text || !integrationsEnabled;
+  const isGenerateDisabled = isLoading;
 
-  const generateTitle = !integrationsEnabled
-    ? 'Client integrations disabled — enable only via .env.local for local demos (npm run dev)'
-    : !isAdoConfigured
-      ? 'You can generate now; configure tracker settings before exporting'
-      : '';
+  const generateHint = !integrationsEnabled
+    ? 'Client integrations disabled — enable only via .env.local for local demos (npm run dev).'
+    : !text.trim()
+      ? 'Paste or upload a requirement to enable generation.'
+      : !isAdoConfigured
+        ? 'You can generate now; configure tracker settings before exporting.'
+        : '';
 
   return (
     <div className="bg-surface p-6 rounded-xl shadow-sm border border-border">
@@ -62,10 +78,14 @@ const InputArea: React.FC<InputAreaProps> = ({
             <textarea
             id="idea-input"
             value={text}
-            onChange={(e) => setText(e.target.value)}
+            onChange={(e) => {
+              setText(e.target.value);
+              if (validationError) setValidationError(null);
+            }}
             placeholder="e.g., An e-commerce platform for selling custom-designed t-shirts. Users should be able to upload their own designs, choose shirt colors, and see a preview before purchasing..."
             className="w-full h-48 p-4 bg-surface-muted border border-border rounded-lg text-foreground focus:ring-2 focus:ring-accent focus:outline-none transition duration-200"
             disabled={isLoading}
+            aria-invalid={Boolean(validationError && !text.trim())}
             />
         </div>
 
@@ -89,8 +109,17 @@ const InputArea: React.FC<InputAreaProps> = ({
         </div>
 
 
+        {(validationError || generateHint) && (
+          <p
+            className={`text-sm ${validationError ? 'text-danger' : 'text-foreground-muted'}`}
+            role={validationError ? 'alert' : undefined}
+          >
+            {validationError || generateHint}
+          </p>
+        )}
+
         <div className="mt-4 flex flex-col sm:flex-row items-center gap-4">
-          <div className="relative w-full sm:w-auto" title={generateTitle}>
+          <div className="relative w-full sm:w-auto">
             <button
                 type="submit"
                 disabled={isGenerateDisabled}

@@ -16,14 +16,28 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  const validationMessage = (): string | null => {
+    if (!apiMode) {
+      return name.trim() ? null : 'Enter your name to continue.';
+    }
+    if (mode === 'register' && !name.trim()) return 'Name is required to register.';
+    if (!email.trim()) return 'Email is required.';
+    if (!password) return 'Password is required.';
+    if (mode === 'register' && password.length < 8) return 'Password must be at least 8 characters.';
+    return null;
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    const message = validationMessage();
+    if (message) {
+      setError(message);
+      return;
+    }
     setError(null);
 
     if (!apiMode) {
-      if (name.trim()) {
-        onLogin({ name: name.trim(), role });
-      }
+      onLogin({ name: name.trim(), role });
       return;
     }
 
@@ -43,9 +57,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     }
   };
 
-  const canSubmit = apiMode
-    ? Boolean(email.trim() && password.length >= (mode === 'register' ? 8 : 1) && (mode === 'login' || name.trim()))
-    : Boolean(name.trim());
+  const canSubmit = validationMessage() === null;
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
@@ -73,7 +85,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
               </button>
             </div>
           )}
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-6" noValidate>
             {(!apiMode || mode === 'register') && (
               <div>
                 <label htmlFor="name" className="block text-sm font-medium text-foreground-secondary">Your Name</label>
@@ -130,10 +142,15 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 </select>
               </div>
             )}
-            {error && <p className="text-sm text-danger">{error}</p>}
+            {error && (
+              <p className="text-sm text-danger" role="alert">
+                {error}
+              </p>
+            )}
             <button
               type="submit"
-              disabled={!canSubmit || busy}
+              disabled={busy}
+              aria-disabled={!canSubmit || busy}
               className="w-full bg-gradient-to-r from-brand-primary to-brand-secondary text-accent-foreground font-semibold py-3 px-6 rounded-lg shadow-sm hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-surface focus:ring-accent transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {busy ? 'Please wait…' : apiMode ? (mode === 'register' ? 'Create account' : 'Login') : 'Login'}
