@@ -1,49 +1,51 @@
 @import "tailwindcss";
 
 /*
-  Design tokens — light is default.
-  Add class="dark" on <html> later for dark mode (toggle not in Phase 1).
+  Design tokens — light is default (Phase 1).
+  Phase 14 Stage 1 — "Card Wall" palette (Paper / Ink / Marker).
+  Add class="dark" on <html> for dark companion theme.
 */
 :root {
-  --color-background: #f8fafc;
+  --color-background: #f5f5f1;
   --color-surface: #ffffff;
-  --color-surface-muted: #f1f5f9;
-  --color-border: #e2e8f0;
-  --color-border-strong: #cbd5e1;
-  --color-foreground: #0f172a;
-  --color-foreground-secondary: #475569;
-  --color-foreground-muted: #64748b;
-  --color-accent: #4f46e5;
-  --color-accent-secondary: #6366f1;
+  --color-surface-muted: #ebebe6;
+  --color-border: #d9d6cf;
+  --color-border-strong: #c4c0b6;
+  --color-foreground: #221f1b;
+  --color-foreground-secondary: #5c574f;
+  /* Muted/warning/success text nudged for WCAG AA on Paper / tinted bgs */
+  --color-foreground-muted: #6b665e;
+  --color-accent: #185e69;
+  --color-accent-secondary: #2a7a86;
   --color-accent-foreground: #ffffff;
-  --color-danger: #b91c1c;
-  --color-danger-bg: #fef2f2;
-  --color-warning: #a16207;
-  --color-warning-bg: #fefce8;
-  --color-success: #15803d;
-  --color-success-bg: #f0fdf4;
+  --color-danger: #a1442c;
+  --color-danger-bg: #f8ebe7;
+  --color-warning: #8a5e10;
+  --color-warning-bg: #f7f0e0;
+  --color-success: #356b3e;
+  --color-success-bg: #e8f2ea;
   --color-ring-offset: #ffffff;
 }
 
 .dark {
-  --color-background: #0f172a;
-  --color-surface: #1e293b;
-  --color-surface-muted: #334155;
-  --color-border: #334155;
-  --color-border-strong: #475569;
-  --color-foreground: #f8fafc;
-  --color-foreground-secondary: #cbd5e1;
-  --color-foreground-muted: #94a3b8;
-  --color-accent: #818cf8;
-  --color-accent-secondary: #a5b4fc;
-  --color-accent-foreground: #0f172a;
-  --color-danger: #fca5a5;
-  --color-danger-bg: #450a0a;
-  --color-warning: #fde047;
-  --color-warning-bg: #422006;
-  --color-success: #86efac;
-  --color-success-bg: #14532d;
-  --color-ring-offset: #0f172a;
+  --color-background: #171512;
+  --color-surface: #211e1a;
+  --color-surface-muted: #2a2621;
+  --color-border: #3a3530;
+  --color-border-strong: #4a443c;
+  --color-foreground: #f3efe6;
+  --color-foreground-secondary: #c9c3b8;
+  --color-foreground-muted: #9a9488;
+  --color-accent: #4fb8c4;
+  --color-accent-secondary: #7acad3;
+  --color-accent-foreground: #171512;
+  --color-danger: #e2836c;
+  --color-danger-bg: #3a1f1a;
+  --color-warning: #d4a017;
+  --color-warning-bg: #2e2410;
+  --color-success: #7fbf83;
+  --color-success-bg: #1a2e1c;
+  --color-ring-offset: #171512;
 }
 
 @theme inline {

@@ -1,6 +1,6 @@
 # ProdMate — Build Tasks (Shared Ground Truth)
 
-_Last updated: July 16, 2026 (Phase 11 + Phase 12 landed)_  
+_Last updated: July 17, 2026 (Phase 14 Stage 1 color tokens)_  
 _Source of truth for multi-phase work. Update status as phases complete._
 
 ## Status legend
@@ -250,6 +250,20 @@ _Source of truth for multi-phase work. Update status as phases complete._
 
 ---
 
+## Phase 14 — Visual identity ("Card Wall")
+
+**Outcome:** ProdMate reads as a planning-room product (paper, ink, marker) instead of generic indigo-on-slate AI UI — via the existing CSS-variable + Tailwind token mechanism.
+
+**Done when:** Stage 1 color direction is approved; Stage 2 type/layout/signature ships without touching routes, APIs, state, or business logic; WCAG AA ratios reported for new tokens; screenshots exist for login / dashboard / review at 375·768·1280 in both themes.
+
+**Hard boundary:** Presentational only (`index.css` Stage 1; component className/JSX presentation Stage 2). No `backend/src/routes`, trackers, or logic `.ts` edits.
+
+- [x] **Stage 1 — color tokens only (2026-07-17).** Remap `:root` / `.dark` in `index.css` to Paper/Ink/Marker/Risk/Thrive; warning `#8A5E10` kept distinct from future Sticky yellow; AA-nudged muted/warning/success text. No component files.
+- [ ] **Stage 2 — type, layout, signature** (blocked on Stage 1 review): `--font-display` mono; Epic spine; Feature de-card; story index-card + tilted story-points sticky; metrics measured=solid / proxy=dashed borders.
+- [x] Verify Stage 1: FE+BE test suites green; WCAG AA ratios computed for required pairs; Playwright screenshots under `.scratch/phase14-stage1-screens/` (login/dashboard/review × light/dark × 375/768/1280).
+
+---
+
 ## Phase reports
 
 ### Phase 0 — 2026-07-16
@@ -366,5 +380,13 @@ _Source of truth for multi-phase work. Update status as phases complete._
 2. **ResultsDisplay re-renders:** local draft inputs/textareas commit on blur (not React.memo) — documented in component. Export-cancel copy updated for request-close abort wiring.
 3. **Polish:** review + Knowledge field labels; Login/Settings/InputArea/Knowledge validation messages; DeleteIcon; tablet `md:` grid + `verify:tablet` Playwright check OK.
 4. **What's next:** Live ClickUp verify when credentials exist; Phase 11 when prioritized.
+
+### Phase 14 Stage 1 — 2026-07-17
+1. **Outcome:** App re-skins through existing Tailwind token classes to Paper/Ink/Marker (light default) with a real dark companion — no structural/UI logic changes.
+2. **What changed:** `index.css` `:root` / `.dark` values only. Warning text `#8A5E10` (distinct from future Sticky). Light muted/warning/success text nudged for AA. Screenshot helper `scripts/phase14-stage1-screenshots.mjs`.
+3. **How verified:** FE 29 tests + BE 42 tests green. WCAG AA ratios (all PASS) listed in stage report. 18 Playwright PNGs in `.scratch/phase14-stage1-screens/`.
+4. **Research applied:** Relative-luminance contrast math (WCAG 2.x); Phase 1 `@theme inline` token wiring unchanged.
+5. **Overrideable decisions:** Accent-secondary = Marker companion teal (role unchanged). Sticky yellow reserved for Stage 2, not used as `--color-warning`.
+6. **What's next:** Stop for Stage 1 review; Stage 2 type/layout/signature only after approval.
 
 _Append further reports below._
