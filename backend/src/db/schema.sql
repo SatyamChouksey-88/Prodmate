@@ -37,4 +37,5 @@ CREATE TABLE IF NOT EXISTS generations (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS generations_user_id_idx ON generations(user_id);
+CREATE INDEX IF NOT EXISTS generations_user_created_idx
+  ON generations (user_id, created_at DESC);
