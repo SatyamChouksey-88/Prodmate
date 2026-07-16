@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { query } from '../db/pool.js';
 import { writeAudit } from '../audit/log.js';
-import { hashPassword, verifyPassword } from './password.js';
+import { DUMMY_PASSWORD_HASH, hashPassword, verifyPassword } from './password.js';
 import {
   clearSessionCookie,
   createSession,
@@ -62,6 +62,7 @@ export async function authRoutes(app: FastifyInstance) {
       return reply.code(400).send({ error: parsed.error.flatten() });
     }
     const { email, password } = parsed.data;
+    const normalizedEmail = email.toLowerCase();
     const result = await query<{
       id: string;
       email: string;
@@ -69,13 +70,19 @@ export async function authRoutes(app: FastifyInstance) {
       role: string;
       password_hash: string;
     }>(`SELECT id, email, name, role, password_hash FROM users WHERE email = $1`, [
-      email.toLowerCase(),
+      normalizedEmail,
     ]);
     const row = result.rows[0];
-    // Note: short-circuit skips bcrypt when user missing — Phase 8 timing side-channel fix.
-    if (!row || !(await verifyPassword(password, row.password_hash))) {
+
+    // Always bcrypt-compare (dummy hash when user missing) — closes timing side-channel.
+    const passwordOk = await verifyPassword(password, row?.password_hash ?? DUMMY_PASSWORD_HASH);
+    if (!row || !passwordOk) {
+      await writeAudit(row?.id ?? null, 'auth.login.failure', {
+        email: normalizedEmail,
+      });
       return reply.code(401).send({ error: 'Invalid email or password' });
     }
+
     const sessionId = await createSession(row.id);
     setSessionCookie(reply, sessionId);
     await writeAudit(row.id, 'auth.login', { email: row.email });
@@ -87,6 +94,13 @@ export async function authRoutes(app: FastifyInstance) {
   app.post('/api/auth/logout', async (request, reply) => {
     const sessionId = request.cookies[SESSION_COOKIE];
     if (sessionId) {
+      const sess = await query<{ user_id: string }>(
+        `SELECT user_id FROM sessions WHERE id = $1`,
+        [sessionId]
+      );
+      if (sess.rows[0]) {
+        await writeAudit(sess.rows[0].user_id, 'auth.logout', {});
+      }
       await destroySession(sessionId);
     }
     clearSessionCookie(reply);

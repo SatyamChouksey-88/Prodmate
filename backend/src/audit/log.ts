@@ -1,7 +1,11 @@
 import { query } from '../db/pool.js';
 
+/**
+ * Persist an audit event. `userId` may be null for unauthenticated failures
+ * (e.g. login with unknown email) after Phase 8 schema change.
+ */
 export async function writeAudit(
-  userId: string,
+  userId: string | null,
   action: string,
   metadata: Record<string, unknown> = {}
 ): Promise<void> {

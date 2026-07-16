@@ -53,6 +53,8 @@ describe('history isolation (user_id scoping)', () => {
     const schema4 = fs.readFileSync(path.join(__dirname, '../db/schema_phase4.sql'), 'utf8');
     await pool.query(schema3);
     await pool.query(schema4);
+    const schema8 = fs.readFileSync(path.join(__dirname, '../db/schema_phase8.sql'), 'utf8');
+    await pool.query(schema8);
 
     const a = await pool.query<{ id: string }>(
       `INSERT INTO users (email, password_hash, name, role)

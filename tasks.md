@@ -1,6 +1,6 @@
 # ProdMate — Build Tasks (Shared Ground Truth)
 
-_Last updated: July 16, 2026 (Phase 6)_  
+_Last updated: July 16, 2026 (Phase 8)_  
 _Source of truth for multi-phase work. Update status as phases complete._
 
 ## Status legend
@@ -150,12 +150,12 @@ _Source of truth for multi-phase work. Update status as phases complete._
 
 **Done when:** Quotas, audit, basic admin, monitoring in place.
 
-- [ ] Per-user/org rate limits on generate
-- [ ] Audit logging (table lands in Phase 4; expand coverage / retention here if needed)
+- [x] Per-user rate limits on generate/export (`@fastify/rate-limit`, keyed by `user_id`; env-tunable; Redis deferred)
+- [x] Audit logging expanded: nullable `user_id` (`schema_phase8.sql`); `auth.login.failure`, `auth.logout`; retention via `AUDIT_RETENTION_DAYS` + `npm run audit:prune`
 - [ ] Basic admin/org invite (only when D9 is revisited — org multi-tenancy)
-- [ ] Monitoring (errors, latency, cost)
-- [ ] **Login timing side-channel:** `POST /api/auth/login` short-circuits bcrypt when the email is missing (`!row || !(await verifyPassword(...))`), so nonexistent emails return faster than wrong passwords — enables user enumeration. Fix by always running a bcrypt compare against a dummy hash when the user is missing (or constant-time path). Not fixed in Phase 3/4.
-- [ ] Verify: pilot checklist signed off
+- [x] Monitoring option A: structured Fastify `onResponse` / `onError` JSON logs + `/api/health` (no new infra)
+- [x] **Login timing side-channel:** always bcrypt-compare (dummy hash when email missing)
+- [x] Verify: backend `tsc` + tests (timing + isolation); frontend lint/typecheck/tests
 
 ---
 
@@ -218,6 +218,14 @@ _Source of truth for multi-phase work. Update status as phases complete._
 3. **How verified:** `npm run lint`, `npm run typecheck`, `npm test` (frontend); `backend` `npm run typecheck` + `npm test` — all green.
 4. **Research applied:** ESLint 9 flat config + typescript-eslint; Vitest; embedded-postgres for real SQL isolation checks.
 5. **Overrideable / trade-offs:** Root ESLint scopes to frontend (backend covered by `tsc` + Vitest). `tasks.md` / analysis docs remain at repo root (may stay untracked).
-6. **What's next:** Phase 7 Knowledge Mesh — confirm priority (D6) before starting.
+6. **What's next:** Phase 7 Knowledge Mesh — wait for review (resolve D9 vs org_id first).
+
+### Phase 8 — 2026-07-16
+1. **Outcome:** Login no longer leaks email existence via timing; generate/export are per-user rate-limited; audit covers failures/logout with retention prune; structured request logs without new infra.
+2. **What changed:** Dummy bcrypt hash always compared on login; `@fastify/rate-limit` (10/hr generate, 30/hr export, env-tunable); `schema_phase8.sql` nullable `audit_logs.user_id`; `auth.login.failure` / `auth.logout`; `AUDIT_RETENTION_DAYS` + `npm run audit:prune`; Fastify `onResponse`/`onError` structured logs (monitoring A).
+3. **How verified:** Backend `tsc --noEmit` + Vitest (login timing + isolation); frontend lint/typecheck/tests.
+4. **Research applied:** `@fastify/rate-limit` createRateLimit + keyGenerator (official Fastify 5 plugin); bcrypt dummy-hash timing equalization.
+5. **Overrideable / trade-offs:** In-memory rate limits (Redis later for multi-instance). Org invite still deferred (D9). Metrics endpoint (B) / OTel (C) skipped until a consumer exists.
+6. **What's next:** Phase 7 Knowledge Mesh — confirm vector/embed/chunk choices and D9 vs org_id before building.
 
 _Append further reports below._
