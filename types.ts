@@ -1,5 +1,3 @@
-import type { ADOConfig } from './services/adoService';
-
 export interface User {
   name: string;
   role: 'Product Owner' | 'Business Analyst' | 'Scrum Master';
