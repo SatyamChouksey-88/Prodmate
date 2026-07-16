@@ -1,6 +1,6 @@
 # ProdMate — Build Tasks (Shared Ground Truth)
 
-_Last updated: July 16, 2026 (Phase 7 Knowledge Mesh built; pgvector isolation pending live DB)_  
+_Last updated: July 16, 2026 (Phase 7 ingest rate limit closed; pgvector isolation pending live DB)_  
 _Source of truth for multi-phase work. Update status as phases complete._
 
 ## Status legend
@@ -140,7 +140,7 @@ _Source of truth for multi-phase work. Update status as phases complete._
 **Done when:** One user’s docs never appear in another user’s retrieval.
 
 - [x] Confirm timing with user (**D6**) + lock **D10** (pgvector) / **D11** (`gemini-embedding-001`)
-- [x] Ingestion → chunk → embed → vector store namespaced by `user_id` (D9)
+- [x] Ingestion → chunk → embed → vector store namespaced by `user_id` (D9); POST ingest rate-limited (`RATE_LIMIT_KNOWLEDGE_INGEST_PER_HOUR`, default 20/hr, same `@fastify/rate-limit` pattern as generate/export)
 - [x] Augment generate flow with RAG; keep manual knowledge textarea as fallback when nothing ingested
 - [~] Verify: cross-user retrieval isolation test (API-level) — **CODE COMPLETE, NOT LIVE-VERIFIED** (no local Postgres+pgvector; Docker/WSL unavailable). Unit query-shape tests always run. Full HNSW/cosine suite gated on `TEST_DATABASE_URL` (skipped here — not a fake pass).
 
@@ -293,5 +293,8 @@ _Source of truth for multi-phase work. Update status as phases complete._
 4. **Research applied:** Google embedding-001 non-3072 dims require manual normalize; pgvector cosine `<=>` + HNSW `vector_cosine_ops`.
 5. **Overrideable / trade-offs:** 768 dims (storage vs quality); top-k = 5; max 200 chunks per ingest. Live isolation remains open until `TEST_DATABASE_URL` points at real Postgres+pgvector.
 6. **What's next:** Re-run backend tests with `TEST_DATABASE_URL` after Docker/`pgvector` is available; then Phase 9 (ClickUp) or other queued work — wait for review.
+
+### Phase 7 addendum — 2026-07-16
+- `POST /api/knowledge/documents` now uses per-user `@fastify/rate-limit` (`RATE_LIMIT_KNOWLEDGE_INGEST_PER_HOUR`, default 20) — same cost-control pattern as generate/export. GET/DELETE unchanged.
 
 _Append further reports below._

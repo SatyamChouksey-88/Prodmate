@@ -14,6 +14,7 @@ export type RateLimitPreHandler = (
 export async function registerRateLimits(app: FastifyInstance): Promise<{
   generateLimit: RateLimitPreHandler;
   exportLimit: RateLimitPreHandler;
+  knowledgeIngestLimit: RateLimitPreHandler;
 }> {
   await app.register(rateLimit, { global: false });
 
@@ -27,6 +28,12 @@ export async function registerRateLimits(app: FastifyInstance): Promise<{
     max: config.rateLimitExportMax,
     timeWindow: '1 hour',
     keyGenerator: (request) => `export:${request.user!.id}`,
+  });
+
+  const checkKnowledgeIngest = app.createRateLimit({
+    max: config.rateLimitKnowledgeIngestMax,
+    timeWindow: '1 hour',
+    keyGenerator: (request) => `knowledge-ingest:${request.user!.id}`,
   });
 
   const generateLimit: RateLimitPreHandler = async (request, reply) => {
@@ -49,5 +56,15 @@ export async function registerRateLimits(app: FastifyInstance): Promise<{
     }
   };
 
-  return { generateLimit, exportLimit };
+  const knowledgeIngestLimit: RateLimitPreHandler = async (request, reply) => {
+    const result = await checkKnowledgeIngest(request);
+    if (result.isAllowed === false && result.isExceeded) {
+      return reply.code(429).send({
+        error: `Knowledge ingest rate limit exceeded (${config.rateLimitKnowledgeIngestMax}/hour). Try again later.`,
+        ttlMs: result.ttl,
+      });
+    }
+  };
+
+  return { generateLimit, exportLimit, knowledgeIngestLimit };
 }

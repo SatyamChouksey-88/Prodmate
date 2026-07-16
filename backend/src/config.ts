@@ -32,6 +32,8 @@ export const config = {
   rateLimitGenerateMax: optionalInt('RATE_LIMIT_GENERATE_PER_HOUR', 10),
   /** Per-user export cap per hour. */
   rateLimitExportMax: optionalInt('RATE_LIMIT_EXPORT_PER_HOUR', 30),
+  /** Per-user knowledge ingest cap per hour (embedding Gemini cost). */
+  rateLimitKnowledgeIngestMax: optionalInt('RATE_LIMIT_KNOWLEDGE_INGEST_PER_HOUR', 20),
   /** Soft retention for audit_logs; pruned via `npm run audit:prune`. */
   auditRetentionDays: optionalInt('AUDIT_RETENTION_DAYS', 90),
 };

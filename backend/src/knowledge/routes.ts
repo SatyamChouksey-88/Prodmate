@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { requireAuth } from '../auth/session.js';
 import { writeAudit } from '../audit/log.js';
+import type { RateLimitPreHandler } from '../rateLimit.js';
 import { chunkText } from './chunk.js';
 import { embedTexts } from '../services/embeddings.js';
 import {
@@ -16,7 +17,10 @@ const ingestSchema = z.object({
   sourceFilename: z.string().max(260).optional().nullable(),
 });
 
-export async function knowledgeRoutes(app: FastifyInstance) {
+export async function knowledgeRoutes(
+  app: FastifyInstance,
+  opts: { knowledgeIngestLimit: RateLimitPreHandler }
+) {
   app.get('/api/knowledge/documents', { preHandler: requireAuth }, async (request) => {
     const result = await listDocumentsForUser(request.user!.id);
     return {
@@ -30,41 +34,47 @@ export async function knowledgeRoutes(app: FastifyInstance) {
     };
   });
 
-  app.post('/api/knowledge/documents', { preHandler: requireAuth }, async (request, reply) => {
-    const parsed = ingestSchema.safeParse(request.body);
-    if (!parsed.success) {
-      return reply.code(400).send({ error: parsed.error.flatten() });
-    }
+  app.post(
+    '/api/knowledge/documents',
+    { preHandler: [requireAuth, opts.knowledgeIngestLimit] },
+    async (request, reply) => {
+      const parsed = ingestSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.code(400).send({ error: parsed.error.flatten() });
+      }
 
-    const chunks = chunkText(parsed.data.content);
-    if (!chunks.length) {
-      return reply.code(400).send({ error: 'Document produced no chunks' });
-    }
-    if (chunks.length > 200) {
-      return reply.code(400).send({ error: 'Document too large (max 200 chunks). Split and ingest separately.' });
-    }
+      const chunks = chunkText(parsed.data.content);
+      if (!chunks.length) {
+        return reply.code(400).send({ error: 'Document produced no chunks' });
+      }
+      if (chunks.length > 200) {
+        return reply.code(400).send({
+          error: 'Document too large (max 200 chunks). Split and ingest separately.',
+        });
+      }
 
-    try {
-      const embeddings = await embedTexts(chunks);
-      const { documentId, chunkCount } = await insertDocumentWithChunks(
-        request.user!.id,
-        parsed.data.title,
-        parsed.data.sourceFilename ?? null,
-        chunks.map((content, i) => ({ content, embedding: embeddings[i] }))
-      );
-      await writeAudit(request.user!.id, 'knowledge.ingest', {
-        documentId,
-        chunkCount,
-        title: parsed.data.title,
-      });
-      return { documentId, chunkCount };
-    } catch (err) {
-      console.error(err);
-      return reply.code(502).send({
-        error: err instanceof Error ? err.message : 'Ingestion failed',
-      });
+      try {
+        const embeddings = await embedTexts(chunks);
+        const { documentId, chunkCount } = await insertDocumentWithChunks(
+          request.user!.id,
+          parsed.data.title,
+          parsed.data.sourceFilename ?? null,
+          chunks.map((content, i) => ({ content, embedding: embeddings[i] }))
+        );
+        await writeAudit(request.user!.id, 'knowledge.ingest', {
+          documentId,
+          chunkCount,
+          title: parsed.data.title,
+        });
+        return { documentId, chunkCount };
+      } catch (err) {
+        console.error(err);
+        return reply.code(502).send({
+          error: err instanceof Error ? err.message : 'Ingestion failed',
+        });
+      }
     }
-  });
+  );
 
   app.delete('/api/knowledge/documents/:id', { preHandler: requireAuth }, async (request, reply) => {
     const { id } = request.params as { id: string };

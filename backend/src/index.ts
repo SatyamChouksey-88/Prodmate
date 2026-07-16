@@ -52,14 +52,14 @@ async function main() {
 
   app.get('/api/health', async () => ({ ok: true, env: config.nodeEnv }));
 
-  const { generateLimit, exportLimit } = await registerRateLimits(app);
+  const { generateLimit, exportLimit, knowledgeIngestLimit } = await registerRateLimits(app);
 
   await authRoutes(app);
   await generateRoutes(app, { generateLimit });
   await exportRoutes(app, { exportLimit });
   await trackerSettingsRoutes(app);
   await historyRoutes(app);
-  await knowledgeRoutes(app);
+  await knowledgeRoutes(app, { knowledgeIngestLimit });
 
   await app.listen({ port: config.port, host: '0.0.0.0' });
   console.log(`ProdMate backend listening on :${config.port}`);
