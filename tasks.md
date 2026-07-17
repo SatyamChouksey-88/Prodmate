@@ -1,6 +1,6 @@
 # ProdMate — Build Tasks (Shared Ground Truth)
 
-_Last updated: July 17, 2026 (Phase 14 Stage 1 color tokens)_  
+_Last updated: July 17, 2026 (Phase 13 Stage 1 verified + approved; D13 LLM gateway still escalated)_  
 _Source of truth for multi-phase work. Update status as phases complete._
 
 ## Status legend
@@ -25,6 +25,7 @@ _Source of truth for multi-phase work. Update status as phases complete._
 | D10 | Knowledge Mesh vector store (Phase 7) | **pgvector** on the existing Azure Database for PostgreSQL (D2) — not a separate vector DB. | **Confirmed** |
 | D11 | Knowledge Mesh embedding model (Phase 7) | **`gemini-embedding-001`** (text-only, GA). Not `gemini-embedding-2` (multimodal) — no multimodal ingestion requirement. | **Confirmed** |
 | D12 | ClickUp auth (Phase 9) | **Personal API token** (`pk_…`), header `Authorization: {token}` — not OAuth2. Escalated to and confirmed by human (2026-07-16). Same pattern as D4 (Jira). Value/risk → **tags** (`value:High`, `risk:Medium`); hierarchy **Epic→List, Feature→Task, Story→Subtask** under a configured **Space** (folderless Lists; no Folder nesting). | **Confirmed** |
+| D13 | Multi-model LLM gateway (free-tier fallback, from strategic review's infra/cost track) | Proposed: `LLMProviderAdapter` behind Gemini + free-tier fallbacks (Groq/Cerebras/OpenRouter pool), gated on (1) no-training-on-data policy per provider and (2) verified structured-output reliability against ProdMate's schema before any provider joins the chain. | **Escalated 2026-07-17 — real cost/infra decision (new provider accounts, per-provider data-policy vetting); awaiting human sign-off before this gets a phase number** |
 
 ---
 
@@ -259,8 +260,33 @@ _Source of truth for multi-phase work. Update status as phases complete._
 **Hard boundary:** Presentational only (`index.css` Stage 1; component className/JSX presentation Stage 2). No `backend/src/routes`, trackers, or logic `.ts` edits.
 
 - [x] **Stage 1 — color tokens only (2026-07-17).** Remap `:root` / `.dark` in `index.css` to Paper/Ink/Marker/Risk/Thrive; warning `#8A5E10` kept distinct from future Sticky yellow; AA-nudged muted/warning/success text. No component files.
-- [ ] **Stage 2 — type, layout, signature** (blocked on Stage 1 review): `--font-display` mono; Epic spine; Feature de-card; story index-card + tilted story-points sticky; metrics measured=solid / proxy=dashed borders.
+- [x] **Stage 2 — type, layout, signature (2026-07-17).** `--font-display` mono (IDs/labels); `--font-headline` serif for epic titles (mono self-critique fallback); Epic left accent spine; Feature de-carded labeled header; story index-card + tilted sticky points; metrics measured=solid / proxy=dashed. Presentational JSX/`index.css` only.
 - [x] Verify Stage 1: FE+BE test suites green; WCAG AA ratios computed for required pairs; Playwright screenshots under `.scratch/phase14-stage1-screens/` (login/dashboard/review × light/dark × 375/768/1280).
+- [x] Verify Stage 2: FE typecheck+lint+29 tests; BE typecheck+42 tests; `npm run verify:tablet` → `TABLET LAYOUT CHECK OK`.
+
+---
+
+## Phase 13 — Trust & discoverability (ranked UX backlog, staged)
+
+**Source:** `.scratch/prodmate-strategic-analysis.html` — five-lens strategic review (BA/PO/SM/CEO/Adoption) + first-time-user walkthrough, ranked top 5.
+
+**Outcome:** Closes the two biggest gaps the strategic review found: ProdMate's two real differentiators (Knowledge Mesh, honestly-labeled Metrics) are currently the most hidden UI elements, and the product never shows back the edit-trust signal it already collects. Both Stage 1 items are additive visibility/defaults work over data and endpoints that already exist and are already tested — no new backend, no schema changes.
+
+**Done when:** Knowledge Mesh and Metrics are visible in the first-run experience without digging into a collapsed sidebar panel below History; each story shows a lightweight, honestly-framed edit/review-trust indicator sourced from real Phase 12 audit data; no functional regression on Phase 5/10/12/14.
+
+**Sequencing (decided under standing PO authority — no new infra/cost/schema for Stage 1–3, so not escalated):**
+- [x] **Stage 1 (2026-07-17).** Ranked #1 — surface Knowledge Mesh + Metrics in the first-run view (defaults/emphasis, not new capability). Ranked #2 — edit-tracking trust badges shown on the artifact itself (reuses Phase 12's `review.edit` / `reviewed_at` data).
+- [ ] Stage 2 — ranked #3, value-vs-effort quadrant + sprint-fit capacity view (pure client-side, no backend change).
+- [ ] Stage 3 — ranked #4, dependency-risk visualization over the existing `dependencies` field.
+- [ ] Stage 4 — ranked #5, source citations for Knowledge-Mesh-informed content. Needs a short design pass first (document-level provenance only — no sentence-level attribution claims), same propose-before-build step Phase 14 used.
+
+**Explicitly held for later, not Phase 13:**
+- Sync-back status from tracker — blocked on a real prerequisite (exported work-item IDs aren't persisted anywhere today); scope that schema addition as its own phase once Phase 13 closes. Externally validated as a core PO/BA need, not just this project's own read.
+- Market-validated candidates (RICE-style score, feedback-loop ingestion — explicitly flagged "do not undersize", roadmap/timeline view) — a later phase.
+- SSO / team invites / pricing tiers — deliberately excluded; requires reopening D9.
+- Multi-model LLM gateway — **escalated as D13**, real cost/infra decision, not scheduled into a phase number yet.
+
+- [ ] Verify: FE+BE test suites green; no regression on Phase 5/10/12/14 functionality; live-render or screenshot evidence for the changed first-run view.
 
 ---
 
@@ -388,5 +414,27 @@ _Source of truth for multi-phase work. Update status as phases complete._
 4. **Research applied:** Relative-luminance contrast math (WCAG 2.x); Phase 1 `@theme inline` token wiring unchanged.
 5. **Overrideable decisions:** Accent-secondary = Marker companion teal (role unchanged). Sticky yellow reserved for Stage 2, not used as `--color-warning`.
 6. **What's next:** Stop for Stage 1 review; Stage 2 type/layout/signature only after approval.
+
+### Phase 14 Stage 2 — 2026-07-17
+1. **Outcome:** Review surface reads as a planning-room card wall — epic spine, feature as labeled section, story as index-card with tilted points sticky — without any API/state/handler changes.
+2. **What changed:**
+   - `index.css`: `--font-display` (mono), `--font-headline` (serif fallback), `--color-sticky` / `--color-sticky-ink`, `.story-points-sticky` (~−1.5°).
+   - `ResultsDisplay.tsx`: Epic `border-l-4` spine + `font-headline` titles; Feature de-carded sub-header; Story index-card + mono ticket ID + sticky points (read + export preview); Header wordmark left sans.
+   - `MetricsDashboard.tsx`: `measured` → solid `border-border-strong`; `proxy` → dashed `border-border`.
+3. **How verified:** FE `typecheck` + `lint` + `vitest` 29/29; BE `typecheck` + `vitest` 42 passed / 2 skipped; `npm run verify:tablet` → `TABLET LAYOUT CHECK OK` (aside/main same top at 768; no horizontal overflow at 390/768/1280). Diff is className/JSX presentation only (no prop/state/handler/API edits).
+4. **Research applied:** Tailwind v4 `@theme inline` `--font-*` → `font-*` utilities; sticky ink `#221f1b` on `#e8c84a` / `#f0c24b` for readable badge contrast (distinct from `--color-warning`).
+5. **Monospace self-critique (required):** Full mono on epic *titles* feels like a terminal/devtools surface, not a PO planning tool — long prose titles in monospace reduce scannability and fight the Paper/Ink room metaphor. **Decision taken:** keep `--font-display` mono for ticket IDs, Epic/Feature *labels*, and sticky numerals; use restrained `--font-headline` (Georgia/Palatino stack) for epic title text only. Colors untouched. Overrideable: revert epic titles to mono if product wants harder “system” identity.
+6. **Overrideable decisions:** Sticky tilt −1.5°; Feature fully de-carded (border-b only); Header/ProdMate wordmark stays `font-sans`.
+7. **What's next:** Stop for Stage 2 review. Do not start ADO/Jira shared-core until Phase 14 is closed.
+
+### Phase 13 Stage 1 — 2026-07-17
+1. **Outcome:** ProdMate's two real differentiators (Knowledge Mesh, honestly-labeled Metrics) are now visible by default in the first-run sidebar instead of buried below History behind a collapsed panel and a Settings wall; a story marked reviewed in Phase 12's collab flow now shows that signal on the card itself, not only inside a collapsed accordion.
+2. **What changed:**
+   - `App.tsx` (~line 631): sidebar render order → `MetricsDashboard` → `KnowledgePanel` → `SettingsPanel` → `HistoryPanel` (was `Settings` → `Metrics` → `Knowledge` → `History`). `SettingsPanel`'s own internal open/closed logic untouched.
+   - `MetricsDashboard.tsx` line 5: `useState(false)` → `useState(true)` — defaults open, matching `KnowledgePanel`'s existing pattern.
+   - `ResultsDisplay.tsx`: added a `"Reviewed"` pill (success-green tokens) next to the ticket ID / story-points sticky on `UserStoryCard`, shown when `Boolean(collab?.reviewedAt)` — reuses the exact `collabByStory` data already threaded through the tree; no new fetch, no new state.
+   - No backend changes, no schema changes, no new endpoints — confirmed via diff (only the three files above touched, plus the pre-existing uncommitted Phase 14 Stage 2 changes already in the tree).
+3. **How verified:** Re-ran independently, not taken from report text. FE `typecheck` + `lint` clean, `vitest` 29/29. BE `typecheck` clean, `vitest` 42 passed / 2 skipped (one transient env-only failure on first run — a leftover embedded-postgres process from my own earlier Phase 14 verification session holding a directory lock; killed the stray process, cleared the lock, re-ran clean — not a Cursor-introduced regression). `npm run verify:tablet` → `TABLET LAYOUT CHECK OK`. Live-rendered in a real browser against a seeded generation (one reviewed story, one not): confirmed via DOM read that sidebar order is now Metrics (open, showing real measured/proxy data) → Knowledge → Settings → History; confirmed via computed styles that the "Reviewed" badge renders only on the seeded-reviewed story (US-1, `rgb(53,107,62)` on `rgb(232,242,234)` — the `--color-success` / `--color-success-bg` tokens) and is absent on the unreviewed story (US-2).
+4. **What's next:** Stage 1 approved. Proceeding to sequence Stage 2 (ranked #3 — value-vs-effort quadrant + sprint-fit capacity view) per the staged plan above.
 
 _Append further reports below._

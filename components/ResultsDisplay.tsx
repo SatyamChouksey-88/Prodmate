@@ -3,6 +3,7 @@ import type { Epic, Feature, UserStory, StoryPoints } from '../types';
 import { STORY_POINTS_OPTIONS } from '../types';
 import type { ExportedWorkItem, BacklogMatch, StoryCollabItem, StoryNote } from '../services/apiClient';
 import StoryCollabPanel from './StoryCollabPanel';
+import BacklogInsights from './BacklogInsights';
 
 /**
  * Band 4 — local draft state (commit on blur), not React.memo.
@@ -115,6 +116,45 @@ const Tag: React.FC<{ label: string; value: 'High' | 'Medium' | 'Low' }> = ({ la
   );
 };
 
+/** Phase 14 signature — presentational only; no data/API coupling. */
+const StoryPointsSticky: React.FC<{ points: number; className?: string }> = ({
+  points,
+  className = '',
+}) => (
+  <span className={`story-points-sticky ${className}`} title={`${points} story points`}>
+    {points}
+  </span>
+);
+
+const PreviewFieldLine: React.FC<{ text: string }> = ({ text }) => {
+  // ADO/Jira dedicated field lines, or ClickUp markdown containing "Story points: N".
+  const dedicated = text.match(
+    /^((?:story\s*points|StoryPoints\/Effort)[^:]*):\s*(\d+)\s*$/i
+  );
+  if (dedicated) {
+    return (
+      <li className="flex flex-wrap items-center gap-2">
+        <span>{dedicated[1]}:</span>
+        <StoryPointsSticky points={Number(dedicated[2])} />
+      </li>
+    );
+  }
+  const embedded = text.match(/^(.*?)(Story\s*points:\s*)(\d+)(.*)$/i);
+  if (embedded) {
+    return (
+      <li className="flex flex-wrap items-center gap-2">
+        <span>
+          {embedded[1]}
+          {embedded[2]}
+        </span>
+        <StoryPointsSticky points={Number(embedded[3])} />
+        {embedded[4] ? <span>{embedded[4]}</span> : null}
+      </li>
+    );
+  }
+  return <li>{text}</li>;
+};
+
 const UserStoryCard: React.FC<{
   story: UserStory;
   editable: boolean;
@@ -141,12 +181,26 @@ const UserStoryCard: React.FC<{
     navigator.clipboard.writeText(textToCopy.trim());
   };
   return (
-    <div className="bg-surface p-4 rounded-lg border border-border relative group transition-all hover:border-accent/50">
+    <div className="bg-surface p-4 rounded-sm border border-border shadow-sm relative group transition-all hover:border-accent/40">
       <div className="flex justify-between items-start">
         <div className="flex-1 pr-8">
-          <p className="font-semibold text-accent mb-2">
-            User Story <span className="text-xs font-mono text-foreground-muted">({story.id})</span>
-          </p>
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wide text-foreground-muted">
+              User Story
+            </span>
+            <span className="font-display text-[0.7rem] font-semibold tracking-wide text-foreground bg-surface-muted border border-border px-1.5 py-0.5 rounded-sm">
+              {story.id}
+            </span>
+            {story.story_points != null && <StoryPointsSticky points={story.story_points} />}
+            {Boolean(collab?.reviewedAt) && (
+              <span
+                className="text-[0.65rem] font-semibold uppercase tracking-wide text-success bg-success-bg border border-success/25 px-1.5 py-0.5 rounded-sm"
+                title="Marked reviewed in collaboration"
+              >
+                Reviewed
+              </span>
+            )}
+          </div>
           {editable ? (
             <DraftTextarea
               id={storyFieldId}
@@ -166,7 +220,7 @@ const UserStoryCard: React.FC<{
           onClick={handleCopy}
           title="Copy details"
           aria-label={`Copy user story ${story.id}`}
-          className="absolute top-3 right-3 p-1.5 bg-surface-muted rounded-md text-foreground-muted hover:bg-border hover:text-foreground opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
+          className="absolute top-3 right-3 p-1.5 bg-surface-muted rounded-md text-foreground-muted hover:bg-border hover:text-foreground opacity-0 group-hover:opacity-100 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-accent transition-opacity"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
@@ -202,16 +256,7 @@ const UserStoryCard: React.FC<{
               ))}
             </select>
           </div>
-        ) : (
-          story.story_points != null && (
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-foreground-muted">Story points:</span>
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-surface-muted text-foreground">
-                {story.story_points}
-              </span>
-            </div>
-          )
-        )}
+        ) : null}
       </div>
 
       <p className="font-semibold text-foreground mb-2">Acceptance Criteria:</p>
@@ -334,14 +379,16 @@ const FeatureCard: React.FC<{
   const titleId = useId();
   const descId = useId();
   return (
-    <div className="bg-surface border border-border rounded-lg overflow-hidden">
+    <div className="overflow-hidden">
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex justify-between items-center p-4 bg-surface-muted hover:bg-border/60 transition-colors duration-200"
+        className="w-full flex justify-between items-center py-3 px-1 text-left border-b border-border hover:bg-surface-muted/60 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-background"
       >
-        <div className="text-left flex-1">
-          <p className="text-sm text-accent font-medium">Feature</p>
+        <div className="text-left flex-1 min-w-0">
+          <p className="font-display text-[0.65rem] uppercase tracking-[0.14em] text-accent font-semibold">
+            Feature
+          </p>
           {editable ? (
             <>
               <DraftInput
@@ -370,12 +417,12 @@ const FeatureCard: React.FC<{
             </>
           )}
         </div>
-        <div className={`text-foreground-muted ${isOpen ? 'rotate-180' : ''}`}>
+        <div className={`text-foreground-muted shrink-0 ${isOpen ? 'rotate-180' : ''}`}>
           <ChevronDownIcon />
         </div>
       </button>
       {isOpen && (
-        <div className="p-4 space-y-4">
+        <div className="pt-3 pb-1 space-y-3">
           {feature.user_stories.map((story, si) => (
             <UserStoryCard
               key={story.id}
@@ -437,14 +484,16 @@ const EpicCard: React.FC<{
   const titleId = useId();
   const descId = useId();
   return (
-    <div className="bg-background border-2 border-border rounded-xl overflow-hidden shadow-sm">
+    <div className="bg-surface border border-border border-l-4 border-l-accent rounded-xl overflow-hidden shadow-sm">
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex justify-between items-center p-6 bg-surface hover:bg-surface-muted transition-colors duration-200"
+        className="w-full flex justify-between items-center p-6 bg-surface hover:bg-surface-muted transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-accent"
       >
-        <div className="text-left flex-1">
-          <p className="text-sm text-accent font-semibold tracking-wider uppercase">Epic</p>
+        <div className="text-left flex-1 min-w-0">
+          <p className="font-display text-[0.7rem] text-accent font-semibold tracking-[0.16em] uppercase">
+            Epic
+          </p>
           {editable ? (
             <>
               <DraftInput
@@ -452,7 +501,7 @@ const EpicCard: React.FC<{
                 label="Epic title"
                 value={epic.epic}
                 stopPropagation
-                className="text-2xl font-extrabold"
+                className="text-2xl font-extrabold font-headline"
                 onCommit={(epicTitle) => onChange({ ...epic, epic: epicTitle })}
                 onEditCommitted={onFieldEdit}
               />
@@ -468,17 +517,19 @@ const EpicCard: React.FC<{
             </>
           ) : (
             <>
-              <h2 className="text-2xl font-extrabold text-foreground mt-1">{epic.epic}</h2>
+              <h2 className="text-2xl font-extrabold font-headline text-foreground mt-1">
+                {epic.epic}
+              </h2>
               <p className="text-md text-foreground-secondary mt-2">{epic.epic_description}</p>
             </>
           )}
         </div>
-        <div className={`text-foreground-muted ${isOpen ? 'rotate-180' : ''}`}>
+        <div className={`text-foreground-muted shrink-0 ${isOpen ? 'rotate-180' : ''}`}>
           <ChevronDownIcon />
         </div>
       </button>
       {isOpen && (
-        <div className="p-6 space-y-4">
+        <div className="px-6 pb-6 pt-2 space-y-4">
           {epic.features.map((feature, i) => (
             <FeatureCard
               key={i}
@@ -572,11 +623,48 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
   onFieldEdit,
   reviewHint = null,
 }) => {
+  const [planView, setPlanView] = useState<'list' | 'insights'>('list');
+
   return (
     <div className="space-y-6 animate-fade-in">
       <h2 className="text-3xl font-bold text-center mb-4 bg-clip-text text-transparent bg-gradient-to-r from-brand-primary to-brand-secondary">
         Generated Agile Plan
       </h2>
+
+      <div
+        className="flex justify-center"
+        role="tablist"
+        aria-label="Plan view"
+      >
+        <div className="inline-flex rounded-lg border border-border bg-surface p-0.5">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={planView === 'list'}
+            onClick={() => setPlanView('list')}
+            className={`px-4 py-1.5 text-sm font-semibold rounded-md focus:outline-none focus:ring-2 focus:ring-accent ${
+              planView === 'list'
+                ? 'bg-surface-muted text-foreground'
+                : 'text-foreground-muted hover:text-foreground'
+            }`}
+          >
+            List
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={planView === 'insights'}
+            onClick={() => setPlanView('insights')}
+            className={`px-4 py-1.5 text-sm font-semibold rounded-md focus:outline-none focus:ring-2 focus:ring-accent ${
+              planView === 'insights'
+                ? 'bg-surface-muted text-foreground'
+                : 'text-foreground-muted hover:text-foreground'
+            }`}
+          >
+            Insights
+          </button>
+        </div>
+      </div>
 
       {showExportActions && (
         <div className="bg-surface border border-border rounded-xl p-4 flex flex-col gap-3">
@@ -650,7 +738,7 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                 )}
                 <ul className="mt-1 text-foreground-secondary list-disc list-inside">
                   {line.fields.map((f) => (
-                    <li key={f}>{f}</li>
+                    <PreviewFieldLine key={f} text={f} />
                   ))}
                 </ul>
               </li>
@@ -742,26 +830,30 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
         </div>
       )}
 
-      {results.map((epic, i) => (
-        <EpicCard
-          key={i}
-          epic={epic}
-          index={i}
-          editable={editable}
-          onRefineStory={onRefineStory}
-          refiningStoryId={refiningStoryId}
-          generationId={generationId}
-          collabByStory={collabByStory}
-          notesByStory={notesByStory}
-          onCollabChange={onCollabChange}
-          onNoteAdded={onNoteAdded}
-          onFieldEdit={onFieldEdit}
-          onChange={(next) => {
-            if (!onResultsChange) return;
-            onResultsChange(results.map((e, ei) => (ei === i ? next : e)));
-          }}
-        />
-      ))}
+      {planView === 'insights' ? (
+        <BacklogInsights results={results} />
+      ) : (
+        results.map((epic, i) => (
+          <EpicCard
+            key={i}
+            epic={epic}
+            index={i}
+            editable={editable}
+            onRefineStory={onRefineStory}
+            refiningStoryId={refiningStoryId}
+            generationId={generationId}
+            collabByStory={collabByStory}
+            notesByStory={notesByStory}
+            onCollabChange={onCollabChange}
+            onNoteAdded={onNoteAdded}
+            onFieldEdit={onFieldEdit}
+            onChange={(next) => {
+              if (!onResultsChange) return;
+              onResultsChange(results.map((e, ei) => (ei === i ? next : e)));
+            }}
+          />
+        ))
+      )}
     </div>
   );
 };

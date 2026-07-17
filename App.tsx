@@ -629,14 +629,14 @@ const App: React.FC = () => {
       <main className="container mx-auto px-4 py-8 max-w-7xl">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6 md:gap-8 items-start">
           <aside className="md:col-span-4 xl:col-span-3 space-y-6 md:sticky md:top-8 md:max-h-[calc(100vh-4rem)] md:overflow-y-auto">
+            {apiMode && <MetricsDashboard />}
+            {apiMode && <KnowledgePanel />}
             <SettingsPanel
               config={trackerConfig}
               onSave={handleSaveTrackerConfig}
               integrationsEnabled={canUseIntegrations}
               useApi={apiMode}
             />
-            {apiMode && <MetricsDashboard />}
-            {apiMode && <KnowledgePanel />}
             <HistoryPanel
               history={history}
               onSelect={handleSelectHistory}

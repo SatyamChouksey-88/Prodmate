@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { apiGetMetricsSummary, type MetricsSummary } from '../services/apiClient';
 
 const MetricsDashboard: React.FC = () => {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(true);
   const [data, setData] = useState<MetricsSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -49,7 +49,14 @@ const MetricsDashboard: React.FC = () => {
             <>
               <ul className="space-y-3">
                 {data.metrics.map((m) => (
-                  <li key={m.id} className="border border-border rounded-lg p-3">
+                  <li
+                    key={m.id}
+                    className={`rounded-lg p-3 border ${
+                      m.kind === 'measured'
+                        ? 'border-solid border-border-strong'
+                        : 'border-dashed border-border'
+                    }`}
+                  >
                     <div className="flex items-center justify-between gap-2">
                       <p className="font-semibold text-foreground">{m.label}</p>
                       <span

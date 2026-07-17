@@ -25,6 +25,12 @@
   --color-success: #356b3e;
   --color-success-bg: #e8f2ea;
   --color-ring-offset: #ffffff;
+  /* Phase 14 Stage 2 — signature sticky (distinct from --color-warning) */
+  --color-sticky: #e8c84a;
+  --color-sticky-ink: #221f1b;
+  /* Ticket/label mono (Stage 2 --font-display). Epic headlines use --font-headline (serif fallback). */
+  --font-display: ui-monospace, "Cascadia Code", "SF Mono", "JetBrains Mono", Consolas, monospace;
+  --font-headline: Georgia, "Iowan Old Style", "Palatino Linotype", Palatino, "Times New Roman", serif;
 }
 
 .dark {
@@ -46,6 +52,8 @@
   --color-success: #7fbf83;
   --color-success-bg: #1a2e1c;
   --color-ring-offset: #171512;
+  --color-sticky: #f0c24b;
+  --color-sticky-ink: #221f1b;
 }
 
 @theme inline {
@@ -68,7 +76,11 @@
   --color-success-bg: var(--color-success-bg);
   --color-brand-primary: var(--color-accent);
   --color-brand-secondary: var(--color-accent-secondary);
+  --color-sticky: var(--color-sticky);
+  --color-sticky-ink: var(--color-sticky-ink);
   --font-sans: "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-display);
+  --font-headline: var(--font-headline);
 }
 
 body {
@@ -96,4 +108,24 @@ body {
 
 .animate-fade-in-scale {
   animation: fade-in-scale 0.2s ease-out forwards;
+}
+
+/* Phase 14 signature — tilted sticky for story points (1–2°, not gimmicky) */
+.story-points-sticky {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.75rem;
+  height: 1.75rem;
+  padding: 0 0.4rem;
+  background-color: var(--color-sticky);
+  color: var(--color-sticky-ink);
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1;
+  transform: rotate(-1.5deg);
+  box-shadow: 1px 1px 0 color-mix(in srgb, var(--color-sticky-ink) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-sticky-ink) 10%, transparent);
+  border-radius: 2px;
 }
