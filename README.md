@@ -53,6 +53,16 @@ Without `VITE_API_URL`, the app can call Gemini/trackers from the browser **only
 
 Not for shared or production builds.
 
+## Security model
+
+| Mode | Where secrets live | Safe for public deploy? |
+|------|-------------------|-------------------------|
+| **API mode (production)** | `GEMINI_API_KEY` and tracker PATs on the **backend** only (`backend/.env`, encrypted at rest). Frontend uses `VITE_API_URL` and session cookies — no keys in the JS bundle. | Yes, when the backend is deployed with proper env and HTTPS. |
+| **Insecure client / demo mode** | Optional `VITE_GEMINI_API_KEY` in `.env.local` (dev only; gated by `import.meta.env.DEV` **and** `VITE_ALLOW_INSECURE_CLIENT_LLM=true`). Tracker org URL + **PAT** can be saved in browser **localStorage** for convenience during local demos. | **No.** Anyone with XSS or physical access to the machine can read localStorage. Do not use production org PATs in this mode. |
+| **Static hosting mistake** | If you build with `npm run build` while `VITE_GEMINI_API_KEY` is set, Vite can embed that value in the published bundle. | **Never** deploy a public static build with `VITE_GEMINI_API_KEY` set. Use API mode instead. |
+
+Report security issues via [GitHub Issues](https://github.com/SatyamChouksey-88/Prodmate/issues) (no secrets in the ticket). See `SECURITY.md`.
+
 ## Scripts (frontend)
 
 ```bash
